@@ -3,6 +3,7 @@
   "files": [
     { "template": "AGENTS.md", "destination": "AGENTS.md" },
     { "template": "gitattributes.txt", "destination": ".gitattributes" },
-    { "template": "gitignore.txt", "destination": ".gitignore" }
+    { "template": "gitignore.txt", "destination": ".gitignore" },
+    { "template": "projects-README.md", "destination": "projects/README.md" }
   ]
 }

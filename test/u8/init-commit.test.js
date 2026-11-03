@@ -32,7 +32,7 @@ test("init commits exactly what it planted as Plant the house, in a repository i
   assert.equal(git(s.house, s.env, ["log", "--format=%s"]).trim(), "Plant the house");
   assert.equal(git(s.house, s.env, ["status", "--porcelain"]), "", "nothing is left uncommitted");
   const names = commitNames(s.house);
-  for (const path of ["house.toml", "AGENTS.md", ".gitattributes", ".gitignore", ".house/planted.json", ".house/generated/kernel.md"]) assert.ok(names.includes(path), path);
+  for (const path of ["house.toml", "AGENTS.md", ".gitattributes", ".gitignore", "projects/README.md", ".house/planted.json", ".house/generated/kernel.md"]) assert.ok(names.includes(path), path);
 
   const again = envelope(s.run(["init", "house", "--json"]).stdout);
   assert.equal(again.commit, null, "a second init has nothing to commit");

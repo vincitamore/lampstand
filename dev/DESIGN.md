@@ -57,6 +57,7 @@ lampstand/                       # default branch = release tree (one built comm
 ├── proposals/{principles,reflexes,provisions,updates}/   # never loaded; adopting moves the file out
 ├── state/current.md
 ├── tasks/  inbox/{captures,decisions,investigations,ideas}/  knowledge/  reminders/
+├── projects/README.md           # what the house builds, one folder per project; the README keeps the folder in a clone
 ├── forge/  rooms/               # created only by the modules that use them
 ├── .house/generated/{kernel,router,worker,watchdog}.md, manifest.json   # committed; header carries an input hash
 ├── .house/planted.json          # what init planted, with hashes (the upgrade comparator)
@@ -291,7 +292,7 @@ Rules for both adapters:
 
 - `lampstand init [<dir>] [--answers <file>] [--default]` plants a house: missing files only, never overwriting;
   a re-run is byte-identical. It writes `house.toml`, the constitution templates (with the lattice unless declined),
-  the org folders, `AGENTS.md` with its generated region, `.gitattributes`, `.house/planted.json` (every planted file
+  the org folders, `AGENTS.md` with its generated region, `.gitattributes`, `projects/README.md`, `.house/planted.json` (every planted file
   with its hash), runs `git init` when the directory is not a repository, and compiles the projections. `--default`
   records the house as `default_house` in per-user config.
 - `lampstand upgrade`: plugin code upgrades through the host's own command; this verb migrates the house. It backs up

@@ -1,7 +1,7 @@
 // @ts-check
 // A newer lampstand is stood in for by a copy of this package whose templates or pack a test changes.
 import assert from "node:assert/strict";
-import { appendFileSync, existsSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { contentHash } from "../../core/lib/io.js";
@@ -75,6 +75,27 @@ test("upgrade plants a file new in this lampstand, and not one the operator remo
   assert.equal(read(s.house, "WATCHDOG.md"), "# Watchdog\n");
   assert.ok(!existsSync(join(s.house, "state", "current.md")));
   assert.equal(JSON.parse(read(s.house, ".house/planted.json")).files["WATCHDOG.md"].sha256, contentHash("# Watchdog\n"));
+});
+
+/** A house planted before projects/README.md existed: the file and its planted.json record are gone. @param {string} house */
+function forgetProjectsReadme(house) {
+  rmSync(join(house, "projects"), { recursive: true, force: true });
+  const planted = JSON.parse(read(house, ".house/planted.json"));
+  delete planted.files["projects/README.md"];
+  writeFileSync(join(house, ".house", "planted.json"), JSON.stringify(planted, null, 2) + "\n");
+}
+
+test("upgrade leaves an operator's own projects/README.md alone", SLOW, (t) => {
+  const s = setup(t);
+  forgetProjectsReadme(s.house);
+  mkdirSync(join(s.house, "projects"), { recursive: true });
+  const own = "# What we build\n\nOur own words.\n";
+  writeFileSync(join(s.house, "projects", "README.md"), own);
+
+  const data = envelope(s.run(["upgrade", "--json"]).stdout);
+  assert.deepEqual([data.planted, data.updated, data.proposed], [[], [], []]);
+  assert.equal(read(s.house, "projects/README.md"), own);
+  assert.equal(JSON.parse(read(s.house, ".house/planted.json")).files["projects/README.md"], undefined, "a file upgrade did not write is not recorded as planted");
 });
 
 test("upgrade refuses a house whose [plugin] min or schema is newer than this lampstand, writing nothing", SLOW, (t) => {

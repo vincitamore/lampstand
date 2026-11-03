@@ -41,11 +41,13 @@ test("init with an answers file plants a house that compiles fresh and lints cle
     "curation.md",
     "house.toml",
     "principles/lattice.md",
+    "projects/README.md",
     "reflexes/INDEX.md",
     "state/current.md",
     "voice.md",
   ]);
   assert.ok(existsSync(join(s.house, ".git")));
+  assert.match(read(s.house, "projects/README.md"), /^# Projects\n/);
 
   const check = s.run(["compile", "--check"], s.house);
   assert.equal(check.status, 0, check.stdout + check.stderr);

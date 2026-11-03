@@ -26,6 +26,7 @@ beside it.
 | `voice.md` | how to collaborate and how to speak on each channel | you, from what you observe |
 | `state/current.md` | standing reality now, kept short | you |
 | `tasks/`, `inbox/`, `knowledge/`, `reminders/` | the work | you, through the verbs |
+| `projects/` | what the house builds, one folder per project | you |
 | `proposals/` | drafts waiting for the operator; never loaded | you propose; the operator adopts |
 | `.house/generated/` | compiled projections; never edit by hand | `lampstand compile` |
 
@@ -62,6 +63,7 @@ Run `lampstand <verb> --help` for flags; add `--json` for one machine-readable o
    a plain reason instead; every other terminal status needs the link. The verb moves the file to `resolved/` and
    fixes links. Never leave resolution for a later tidy-up.
 2. **Files are written through verbs** where a verb exists. Hand edits to frontmatter skip the checks the verbs make.
+   New work that is code or an artifact goes in `projects/<name>/`, never at the house's top level.
 3. **A changed normative file is recompiled.** After editing anything under `principles/`, `charter/`, `reflexes/` or
    `voice.md`, run `lampstand compile`; `compile --check` failing means the projections are stale.
 4. **Ask first** before anything on the ask-first list in `house.toml`. `init` plants these defaults unless the operator

@@ -21,6 +21,12 @@ test("work outside the record folders owes a task record and a state update unti
   assert.deepEqual(ids(evaluateGate(root, [outside, "tasks/x.md", join(root, "state", "current.md")], "remind")), []);
 });
 
+test("a change under projects/ is ordinary work: it owes a task record and a state update", (t) => {
+  const { root } = makeHouse(t);
+  assert.deepEqual(ids(evaluateGate(root, ["projects/tool/src/main.js", "projects/README.md"], "remind")), ["task", "state"]);
+  assert.deepEqual(ids(evaluateGate(root, ["projects/tool/src/main.js", "tasks/x.md", "state/current.md"], "remind")), []);
+});
+
 test("a session that only maintained the record owes nothing", (t) => {
   const { root } = makeHouse(t);
   assert.deepEqual(ids(evaluateGate(root, ["inbox/captures/a.md", "knowledge/k.md", "forge/sessions/s.md"], "block")), []);

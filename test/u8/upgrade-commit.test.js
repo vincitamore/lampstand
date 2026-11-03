@@ -1,10 +1,11 @@
 // @ts-check
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { commitNames, gitEnv } from "../u2/helpers.js";
+import { contentHash } from "../../core/lib/io.js";
 import { answersToml, copyPackage, envelope, lampstand, read, SLOW, tempDir } from "./helpers.js";
 
 /** @param {import("./helpers.js").TestContext} t @param {boolean} identity */
@@ -48,6 +49,24 @@ test("upgrade commits what it replaced, proposed and re-recorded, and not an edi
   const again = envelope(s.run(["upgrade", "--json"]).stdout);
   assert.equal(again.commit, null, "an upgrade that changes nothing commits nothing");
   assert.equal(s.git(["rev-parse", "HEAD"]).trim(), head);
+});
+
+test("upgrade plants projects/README.md into a house that lacks it, and commits it", SLOW, (t) => {
+  const s = setup(t, true);
+  rmSync(join(s.house, "projects"), { recursive: true, force: true });
+  const planted = JSON.parse(read(s.house, ".house/planted.json"));
+  delete planted.files["projects/README.md"];
+  writeFileSync(join(s.house, ".house", "planted.json"), JSON.stringify(planted, null, 2) + "\n");
+  s.git(["add", "-A"]);
+  spawnSync("git", ["commit", "-q", "-m", "An older house"], { cwd: s.house, env: gitEnv(join(s.house, ".."), true) });
+
+  const data = envelope(s.run(["upgrade", "--json"]).stdout);
+  assert.deepEqual([data.planted, data.updated, data.proposed], [["projects/README.md"], [], []]);
+  assert.equal(read(s.house, "projects/README.md"), read(s.pkg, "templates/root/projects-README.md"));
+  assert.equal(JSON.parse(read(s.house, ".house/planted.json")).files["projects/README.md"].sha256, contentHash(read(s.pkg, "templates/root/projects-README.md")));
+  assert.equal(data.commit, s.git(["rev-parse", "HEAD"]).trim());
+  assert.ok(commitNames(s.house, "HEAD").includes("projects/README.md"), "the planted file is in the upgrade commit");
+  assert.equal(s.git(["status", "--porcelain"]), "");
 });
 
 test("upgrade with no git identity still upgrades, leaves it uncommitted, and gives the command", SLOW, (t) => {

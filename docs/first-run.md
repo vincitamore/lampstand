@@ -48,6 +48,7 @@ and names the fix for anything that is not.
 - Read `principles/lattice.md`. Edit any principle, or delete one that does not fit. Run `lampstand compile` after.
 - Read `charter/core.md`, and `voice.md`.
 - Add a task: `lampstand task new "First thing to do"`.
+- Put what the house builds in `projects/<name>/`; `projects/README.md` says how it sits beside the records.
 
 ## Adopt
 
