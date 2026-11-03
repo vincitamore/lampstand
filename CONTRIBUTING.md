@@ -34,7 +34,8 @@ node dev/release.js --out <empty dir>
 python dev/scan-gate.py <a Hermes install's venv python>   # or HERMES_PYTHON=...
 ```
 
-`node --test` needs the glob: given a directory, Node loads it as a module instead of searching it.
+`node --test` needs the glob: given a directory, Node loads it as a module instead of searching it. On Node older
+than 22.18, add `--experimental-strip-types`: the OMP adapter's tests import its TypeScript source.
 
 ## Trying a change in a host
 

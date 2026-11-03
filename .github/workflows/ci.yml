@@ -30,7 +30,11 @@ jobs:
           python-version: "3.11"
       - run: npm ci --no-audit --no-fund
       - run: npx tsc --noEmit -p .
-      - run: node --test "test/**/*.test.js"
+      # The OMP adapter is TypeScript (OMP runs it under Bun); Node strips types by default from 22.18 only.
+      - if: matrix.node != '22.13'
+        run: node --test "test/**/*.test.js"
+      - if: matrix.node == '22.13'
+        run: node --experimental-strip-types --test "test/**/*.test.js"
       - run: python -m unittest discover -s test
       - run: node dev/version-sync.js
       - run: node dev/clean-room-check.js

@@ -128,14 +128,16 @@ test("two concurrent jobs never claim each other's paths", SPAWNS, async (t) => 
   await new Promise((resolve) => setTimeout(resolve, 1500));
   writeFileSync(go, "");
   const [alpha, beta] = (await Promise.all(runs)).map((result) => envelope(result.stdout));
+  // Each reply must be a run result: an error envelope has no job, and would make the comparisons below vacuous.
+  for (const [name, reply] of [["alpha", alpha], ["beta", beta]]) assert.equal(reply.job, name, JSON.stringify(reply));
 
   const own = { alpha: ["alpha/a1.md", "alpha/a2.md"], beta: ["beta/b1.md"] };
   const winner = alpha.landed.includes("shared/same.md") ? alpha : beta;
   const loser = winner === alpha ? beta : alpha;
-  assert.deepEqual(winner.landed, [...own[/** @type {"alpha" | "beta"} */ (winner.job)], "shared/same.md"].sort());
+  assert.deepEqual(winner.landed, [...own[/** @type {"alpha" | "beta"} */ (winner.job)], "shared/same.md"].sort(), JSON.stringify(winner));
   assert.equal(winner.outcome, "landed", winner.detail);
-  assert.deepEqual(loser.landed, own[/** @type {"alpha" | "beta"} */ (loser.job)]);
-  assert.equal(loser.outcome, "not_landed");
+  assert.deepEqual(loser.landed, own[/** @type {"alpha" | "beta"} */ (loser.job)], JSON.stringify(loser));
+  assert.equal(loser.outcome, "not_landed", JSON.stringify(loser));
   assert.match(loser.detail, /shared\/same\.md: already exists in the house; not replaced/);
   assert.equal(readFileSync(join(root, "shared", "same.md"), "utf8"), winner.job);
   assert.deepEqual(namesIn(root, env, winner.commit), winner.landed);
