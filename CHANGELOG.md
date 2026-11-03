@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.2
 
 - `lampstand init` plants `projects/README.md`, a place for what the house builds, and `lampstand upgrade` plants it in
   houses that lack it.
