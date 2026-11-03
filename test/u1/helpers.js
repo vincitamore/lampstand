@@ -29,6 +29,9 @@ export function isolatedEnv(dir) {
   /** @type {NodeJS.ProcessEnv} */
   const env = { ...process.env, LAMPSTAND_STATE_ROOT: join(dir, "state-root"), LAMPSTAND_CONFIG_ROOT: join(dir, "config-root") };
   delete env.HOUSE_ROOT;
+  // bun runs every test file in one process, and loading the OMP adapter marks that process as an agent's
+  // (LAMPSTAND_AGENT); a test that means an agent's shell sets the marker itself.
+  delete env.LAMPSTAND_AGENT;
   // The child's local date must be the test's: bun's runner works in UTC without setting TZ, so a node child would
   // otherwise use the machine's zone and write a different date in the hours the two calendars differ.
   env.TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
