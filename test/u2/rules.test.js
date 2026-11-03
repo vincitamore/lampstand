@@ -99,9 +99,11 @@ test("unconditional-surfaces: more than five surfaces declared to load always is
 
 test("editorial matters are never errors: a kernel over its target is information", (t) => {
   const root = tempDir(t);
-  plantHouse(root);
+  plantHouse(root, { askFirst: Array.from({ length: 16 }, (_, k) => `Ask before step ${k}: ${"y".repeat(50)}`), purpose: "p".repeat(600) });
   const run = runCompile(root);
   assert.deepEqual(run.errors, []);
+  const kernel = run.compiled.manifest.surfaces.kernel.chars;
+  assert.ok(kernel > 3500 && kernel <= 4000, `kernel is ${kernel}`);
   assert.deepEqual(
     run.findings.map((f) => [f.rule, f.level]),
     [["budget", "info"]],

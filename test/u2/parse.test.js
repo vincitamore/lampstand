@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parsePrincipleText, parseProvisionText, parseReflexText, parseVoiceText } from "../../core/lib/constitution/parse.js";
+import { renderKernel } from "../../core/lib/constitution/compile.js";
 import { LATTICE_ADOPTED } from "./helpers.js";
 
 const PROVENANCE = `origin: "own"\nadopted: "2026-11-02"\nadopted-hash: "${"0".repeat(64)}"`;
@@ -22,6 +23,7 @@ test("every lattice principle parses with a thesis, facets and a failure mode; B
     assert.ok(p.name.length > 0 && p.thesis.length > 0, `${p.mark} has a name and thesis`);
     assert.ok(!p.thesis.startsWith("*") && !p.thesis.endsWith("*"), `${p.mark} thesis is unwrapped`);
     assert.ok(p.facets.length >= 7, `${p.mark} has its facets`);
+    assert.ok(p.kernel && p.kernel.length > 0 && p.kernel.length < p.thesis.length + (p.failureMode?.summary.length ?? 0), `${p.mark} has a kernel line shorter than the thesis and failure mode it stands for`);
     assert.ok(p.failureMode && p.failureMode.label === "Vice" && p.failureMode.text.length > 0 && p.failureMode.summary.length > 0, `${p.mark} has a failure mode`);
   }
   assert.deepEqual(file.sections.map((s) => s.title), ["Borders", "Lattice curation discipline"]);
@@ -104,4 +106,24 @@ test("voice is read whole, with each level-2 heading a channel", () => {
     { name: "email", text: "Full sentences." },
   ]);
   assert.ok(voice.text.startsWith("# Voice"));
+});
+
+test("a principle's optional *Kernel:* line is read anywhere in its block, one at most, and the kernel carries it in place of thesis and failure mode", () => {
+  const block = (/** @type {string} */ head, /** @type {string} */ middle = "", /** @type {string} */ tail = "") =>
+    `### a : Plain\n\n${head}*The thesis.*\n\n${middle}- **f**: x\n\n*Failure mode:* Doing it blind.\n\n${tail}`;
+  const parse = (/** @type {string} */ text) => parsePrincipleText(own(text), "/house/principles/own.md").principles[0];
+  assert.equal(parse(block("")).kernel, null);
+  assert.equal(parse(block("*Kernel:* Short one.\n\n")).kernel, "Short one.", "before the thesis");
+  assert.equal(parse(block("", "*Kernel:* Short\ntwo lines.\n\n")).kernel, "Short two lines.", "between thesis and facets");
+  assert.equal(parse(block("", "", "*Kernel:* At the end.\n")).kernel, "At the end.");
+  assert.equal(parse(block("*Kernel:* Short one.\n\n")).thesis, "The thesis.");
+
+  assert.throws(() => parse(block("*Kernel:* One.\n\n", "", "*Kernel:* Two.\n")), /principle a : Plain has 2 `\*Kernel:\*` lines; a principle has at most one/);
+  assert.throws(() => parse(block("", "*Kernel:*\n\n")), /principle a : Plain has an empty `\*Kernel:\*` line/);
+
+  const withLine = parse(block("*Kernel:* Short one.\n\n"));
+  const without = parse(block(""));
+  const house = (/** @type {any} */ p) => /** @type {any} */ ({ purpose: { text: "" }, askFirst: [], principleFiles: [{ principles: [p] }] });
+  assert.equal(renderKernel(house(withLine)), "Principles:\n- a Plain: Short one.");
+  assert.equal(renderKernel(house(without)), "Principles:\n- a Plain: The thesis. Failure mode: Doing it blind.");
 });

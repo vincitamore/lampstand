@@ -19,7 +19,7 @@ export const ERROR_CODES = Object.freeze(/** @satisfies {Record<string, ErrorSpe
   E_NO_HOUSE: { exit: 1, meaning: "The verb needs a house and none was resolved: the plugin is dormant here." },
   E_OPERATOR_ONLY: {
     exit: 1,
-    meaning: "An act that belongs to the operator was asked for from an agent's shell (LAMPSTAND_AGENT is set), such as adopting a principle or provision.",
+    meaning: "An act that belongs to the operator was asked for from an agent's shell (LAMPSTAND_AGENT is set), such as adopting a principle or provision, or registering or removing the scheduler.",
   },
   E_PARSE_TOML: { exit: 1, meaning: "A TOML file is malformed or uses a construct outside lampstand's TOML subset." },
   E_PARSE_FRONTMATTER: {

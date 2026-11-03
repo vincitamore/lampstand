@@ -12,8 +12,9 @@ lampstand init ~/my-house
 2. **Its name.**
 3. **Who has care of it:** your name, and anyone who shares it.
 4. **What the work is for:** one or two sentences, at most 600 characters. This opens every session's kernel, which
-   also holds one line per principle and your ask-first lines in at most 4,000 characters; with the lattice and the
-   default ask-first lines that leaves about 250 characters for the purpose, and `init` asks again if they do not fit.
+   also holds one line per principle and your ask-first lines in at most 4,000 characters; the lattice's
+   kernel lines and the default ask-first lines leave room for the whole 600, and `init` asks again if your own lines
+   make them overflow.
 5. **How rules are made:** `none`, `rules` (you enact, the agent drafts) or `agreement` (a written agreement between
    you and the agent).
 6. **What always needs asking first,** and how the agent should speak on each channel you use. The ask-first list
@@ -59,6 +60,6 @@ or `Strike <kind>/<slug>`, naming each item; when every item is left for later, 
 
 Nothing runs on its own until you turn it on:
 
-- **Jobs:** declare them in `house.toml [jobs]` (`lampstand run --help` shows the shape), set `[modules] scheduler = true`, then `lampstand scheduler enable`
+- **Jobs:** declare them in `house.toml [jobs]` (`lampstand run --help` shows the shape), set `[modules] scheduler = true`, then `lampstand scheduler enable` in your own terminal (an agent's shell is refused)
   lists the one OS entry it will create and asks before creating it.
 - **Rooms:** install agora, set `[modules] rooms = true`, then `lampstand rooms enable`, which commits what it seeds and proposes.

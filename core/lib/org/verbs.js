@@ -538,7 +538,7 @@ export const gateVerb = {
     return {
       exit: result.block ? 1 : 0,
       data: { mode: result.mode, owed: result.owed, block: result.block, source: result.source },
-      text: result.owed.length === 0 ? `gate (${result.mode}): nothing owed` : `gate (${result.mode}): owed\n${lines.join("\n")}${result.block ? `\n${result.block}` : ""}`,
+      text: result.owed.length === 0 ? `gate (${result.mode}): nothing owed` : `gate (${result.mode}): owed\n${lines.join("\n")}${result.block ? "\nblock: the session cannot end until these are done" : ""}`,
     };
   },
 };

@@ -136,12 +136,17 @@ test("an answer the house would refuse stops init before its first write", SLOW,
 
 test("answers whose kernel would overflow its cap are refused before the first write; the largest that fits compiles to the predicted size", SLOW, (t) => {
   // The purpose, one line per principle and the ask-first lines share the kernel's hard cap, so a purpose within its
-  // own limit can still be refused beside the lattice. answersToml plants the lattice, the default ask-first lines and one of its own.
-  const fits = (/** @type {number} */ n) => kernelFit({ purpose: "x".repeat(n), askFirst: [...DEFAULT_ASK_FIRST, "Ask before pushing to any remote."], lattice: true });
+  // own limit can still be refused beside the lattice and a long ask-first list: the answers plant the lattice, the default
+  // ask-first lines and fourteen long ones of their own.
+  const own = Array.from({ length: 14 }, (_, k) => `Ask before doing the ${k}th thing on this long list of things: ${"z".repeat(40)}`);
+  const fits = (/** @type {number} */ n) => kernelFit({ purpose: "x".repeat(n), askFirst: [...DEFAULT_ASK_FIRST, ...own], lattice: true });
   let largest = 0;
   while (fits(largest + 1).over === 0) largest += 1;
   assert.ok(largest < PURPOSE_MAX, "the lattice leaves less room than the purpose's own limit");
-  const withPurpose = (/** @type {number} */ n) => answersToml().replace(/^purpose = .*$/m, `purpose = ${JSON.stringify("x".repeat(n))}`);
+  const withPurpose = (/** @type {number} */ n) =>
+    answersToml()
+      .replace(/^purpose = .*$/m, `purpose = ${JSON.stringify("x".repeat(n))}`)
+      .replace(/^ask_first = .*$/m, `ask_first = ${JSON.stringify(own)}`);
 
   const over = setup(t, withPurpose(largest + 1));
   const refused = over.run(["init", "house", "--answers", "answers.toml", "--json"]);

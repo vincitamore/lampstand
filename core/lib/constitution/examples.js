@@ -20,9 +20,12 @@ export const PROPOSAL_EXAMPLES = Object.freeze(
         "",
         "*Failure mode:* polishing what nobody uses.",
         "",
+        "*Kernel:* Leave it better than you found it; do not polish what nobody uses.",
+        "",
       ].join("\n"),
       notes: [
         "A heading `### <mark> : <Name>`, an italic one-sentence thesis, `- **facet**: text` bullets, and a `*Failure mode:*` (or `*Vice:*`) paragraph.",
+        "The optional `*Kernel:*` line (one line, anywhere in the block) is what every session's kernel carries for this principle in place of its thesis and failure mode; without it the kernel carries both, which costs more of its 4,000 characters.",
         "One file may hold several principles. No frontmatter is needed; adopt adds `origin: own`.",
       ],
     },

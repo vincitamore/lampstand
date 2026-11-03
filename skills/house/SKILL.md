@@ -29,7 +29,7 @@ beside it.
 | `proposals/` | drafts waiting for the operator; never loaded | you propose; the operator adopts |
 | `.house/generated/` | compiled projections; never edit by hand | `lampstand compile` |
 
-What your host loaded at session start is the kernel (purpose, every principle's thesis and failure mode, the
+What your host loaded at session start is the kernel (purpose, one line per principle, the
 ask-first lines) and, in a main session, the router (the full principles, the charter, the reflex index, voice).
 A subagent gets the kernel and the reflexes for its host only.
 
@@ -48,7 +48,8 @@ Run `lampstand <verb> --help` for flags; add `--json` for one machine-readable o
   adds `occasion` and `proposed` to the frontmatter itself.
 - **Pipelines:** `forge new|log|status` (see the orchestrate skill).
 - **Jobs:** `run <job>`, `run --status`, `tick`, `scheduler enable|disable|status` (the scheduler is off until the
-  operator turns it on with `[modules] scheduler = true`). A job is a `[jobs.<id>]` table in house.toml with `argv` and
+  operator turns it on with `[modules] scheduler = true`, and `scheduler enable|disable` are refused from your shell
+  with `E_OPERATOR_ONLY`: the operator runs them in a terminal). A job is a `[jobs.<id>]` table in house.toml with `argv` and
   `stale_hours` required, and `every`, `at`, `outputs`, `mutates`, `commit` optional; `run --help` shows an example.
 - **The house itself:** `init`, `upgrade`, `doctor`, `seat status|reset`, `root`, `gate`.
 

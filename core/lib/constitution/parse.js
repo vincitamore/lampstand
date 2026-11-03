@@ -74,7 +74,7 @@ function optionalString(frontmatter, key) {
  * @typedef {{ label: "Vice" | "Failure mode", text: string, summary: string }} FailureMode
  * @typedef {{
  *   path: string, line: number, mark: string, name: string, thesis: string, facets: Facet[],
- *   failureMode: FailureMode | null,
+ *   failureMode: FailureMode | null, kernel: string | null,
  * }} Principle
  * @typedef {{ path: string, line: number, title: string, text: string }} Section
  * @typedef {{
@@ -87,6 +87,7 @@ const HEADING = /^(#{1,3})[ \t]+(.+?)[ \t]*$/;
 const PRINCIPLE_HEADING = /^(\S(?:.*?\S)?) : (\S(?:.*\S)?)$/;
 const FACET = /^[-*] \*\*(.+?)\*\*:[ \t]+(\S.*)$/;
 const FAILURE_LABEL = /^\*(Vice|Failure mode):\*[ \t]*/;
+const KERNEL_LABEL = /^\*Kernel:\*[ \t]*/;
 const FENCE = /^[ \t]{0,3}(`{3,}|~{3,})/;
 
 /**
@@ -211,11 +212,13 @@ export function parsePrincipleText(text, path, standing = "adopted") {
 function parsePrinciple(lines, prose, from, to, at) {
   const { path, line, mark, name } = at;
   const blocks = paragraphs(lines, prose, from, to);
-  const thesisMatch = blocks.length > 0 ? /^\*(?!\*)(.*[^*\s])\*$/.exec(blocks[0].text) : null;
+  // The thesis is the first paragraph that is not a `*Kernel:*` line, which may stand anywhere in the block.
+  const first = blocks.find((block) => !KERNEL_LABEL.test(block.text));
+  const thesisMatch = first ? /^\*(?!\*)(.*[^*\s])\*$/.exec(first.text) : null;
   if (!thesisMatch) {
     throw fail("E_SCHEMA", `principle ${mark} : ${name} must open with an italic thesis paragraph (*...*)`, {
       path,
-      line: blocks.length > 0 ? at.bodyLine + blocks[0].index : line,
+      line: first ? at.bodyLine + first.index : line,
     });
   }
   /** @type {Facet[]} */
@@ -242,7 +245,19 @@ function parsePrinciple(lines, prose, from, to, at) {
     if (text !== "") failureMode = { label: /** @type {"Vice" | "Failure mode"} */ (label[1]), text, summary: failureSummary(text) };
     break;
   }
-  return { path, line, mark, name, thesis: thesisMatch[1].trim(), facets, failureMode };
+  // An optional `*Kernel:* <one line>` paragraph, anywhere in the block: the line the kernel carries for this
+  // principle in place of its thesis and failure mode.
+  const kernels = blocks.filter((block) => KERNEL_LABEL.test(block.text));
+  if (kernels.length > 1) {
+    throw fail("E_SCHEMA", `principle ${mark} : ${name} has ${kernels.length} \`*Kernel:*\` lines; a principle has at most one`, { path, line: at.bodyLine + kernels[1].index });
+  }
+  /** @type {string | null} */
+  let kernel = null;
+  if (kernels.length === 1) {
+    kernel = kernels[0].text.replace(KERNEL_LABEL, "").trim();
+    if (kernel === "") throw fail("E_SCHEMA", `principle ${mark} : ${name} has an empty \`*Kernel:*\` line`, { path, line: at.bodyLine + kernels[0].index });
+  }
+  return { path, line, mark, name, thesis: thesisMatch[1].trim(), facets, failureMode, kernel };
 }
 
 /**

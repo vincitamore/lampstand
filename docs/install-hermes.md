@@ -4,7 +4,7 @@ lampstand needs Hermes 0.22.6 or newer, Node 22.13 or newer and git.
 
 ```sh
 hermes plugins install vincitamore/lampstand
-npm install -g "github:vincitamore/lampstand#v0.1.0"
+npm install -g "github:vincitamore/lampstand#v0.2.0"
 ```
 
 Hermes scans the plugin, then asks two questions:

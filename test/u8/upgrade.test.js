@@ -116,3 +116,21 @@ test("a changed lattice pack is never written over the house's copy: unedited ge
   assert.match(note, /# The lattice pack changed/);
   assert.ok(!note.includes("A newer closing paragraph."), "an edited copy gets a note, not the text");
 });
+
+test("a pack that reworded a principle's *Kernel:* line is offered as an update proposal; the house's copy and its kernel stay as they were", SLOW, (t) => {
+  const s = setup(t);
+  const packPath = join(s.pkg, "packs", "lattice", "LATTICE.md");
+  const pack = read(s.pkg, "packs/lattice/LATTICE.md");
+  const before = /^\*Kernel:\* (.+)$/m.exec(pack);
+  assert.ok(before, "the shipped pack carries kernel lines");
+  writeFileSync(packPath, pack.replace(before[0], "*Kernel:* A reworded kernel line from a newer pack."));
+  const lattice = read(s.house, "principles/lattice.md");
+  const kernel = read(s.house, ".house/generated/kernel.md");
+
+  const result = envelope(s.run(["upgrade", "--json"]).stdout);
+  assert.deepEqual(result.proposed, ["proposals/updates/principles/lattice.md"]);
+  assert.equal(read(s.house, "principles/lattice.md"), lattice, "the operator's copy is theirs");
+  assert.equal(read(s.house, ".house/generated/kernel.md"), kernel, "the kernel still carries the adopted line");
+  assert.ok(read(s.house, "proposals/updates/principles/lattice.md").includes("*Kernel:* A reworded kernel line from a newer pack."));
+  assert.equal(s.run(["compile", "--check"]).status, 0);
+});

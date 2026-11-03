@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
 import { checkGate, evaluateGate } from "../../core/lib/gate.js";
-import { makeHouse } from "./helpers.js";
+import { cli, makeHouse } from "./helpers.js";
 
 /** @param {import("../../core/lib/gate.js").GateResult} result */
 const ids = (result) => result.owed.map((item) => item.id);
@@ -68,4 +68,20 @@ test("checkGate reads house.toml [gate] mode, defaulting to remind", (t) => {
   assert.deepEqual(checkGate(off.root, ["src/x.js"]).owed, []);
   const bad = makeHouse(t, { toml: '[gate]\nmode = "loud"\n' });
   assert.throws(() => checkGate(bad.root, []), /gate\.mode must be one of/);
+});
+
+test("lampstand gate in block mode prints the owed list once, then one closing line", async (t) => {
+  const house = makeHouse(t, { toml: '[gate]\nmode = "block"\n' });
+  const blocked = await cli(["gate", "src/x.js"], house);
+  assert.equal(blocked.code, 1);
+  const lines = blocked.stdout.trimEnd().split("\n");
+  assert.equal(lines[0], "gate (block): owed");
+  assert.match(lines[1], /^ {2}task: record the session's work/);
+  assert.match(lines[2], /^ {2}state: update state\/current\.md/);
+  assert.equal(lines[3], "block: the session cannot end until these are done");
+  assert.equal(lines.length, 4);
+  assert.doesNotMatch(blocked.stdout, /owes the house before it ends/);
+  const clear = await cli(["gate", "tasks/x.md", "state/current.md", "src/x.js"], house);
+  assert.equal(clear.code, 0);
+  assert.equal(clear.stdout.trim(), "gate (block): nothing owed");
 });

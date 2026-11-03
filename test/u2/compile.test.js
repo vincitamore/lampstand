@@ -4,7 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { chars, KERNEL_FRAMING_CHARS } from "../../core/lib/constitution/budgets.js";
-import { compileHouse, projectionMarker, readHeader, renderKernel, withProjection } from "../../core/lib/constitution/compile.js";
+import { compileHouse, projectionMarker, readHeader, renderKernel, withoutKernelLines, withProjection } from "../../core/lib/constitution/compile.js";
 import { inputHash, loadHouse, readInputs } from "../../core/lib/constitution/house.js";
 import { HOSTS } from "../../core/lib/constitution/parse.js";
 import { runCompile } from "../../core/lib/constitution/run.js";
@@ -34,8 +34,10 @@ test("the lattice house compiles: K fits 4,000 chars after Hermes framing and R 
   const detail = run.compiled.manifest.surfaces["principle-detail"];
   assert.equal(detail.cap, 36000);
   assert.ok(detail.chars <= detail.cap);
-  for (const line of kernel.split("\n").filter((l) => l.startsWith("- ") && l.includes("Failure mode:"))) assert.ok(line.length > 0);
-  assert.equal(kernel.split("\n").filter((l) => / Failure mode: /.test(l)).length, 13, "one kernel line per lattice principle");
+  const principleLines = /** @type {string} */ (kernel.split("\n\n").find((block) => block.startsWith("Principles:"))).split("\n").slice(1);
+  assert.equal(principleLines.length, 13, "one kernel line per lattice principle");
+  assert.ok(principleLines.every((line) => !/ Failure mode: /.test(line)), "each carries its *Kernel:* line, not its thesis and failure mode");
+  assert.ok(framed < 3500, `a fresh lattice house is under the kernel target: ${framed}`);
   assert.ok(!kernel.includes("Borders") && !kernel.includes("curation discipline"), "the lattice's trailing sections stay out of K");
   const router = generated(root, "router.omp.md");
   assert.ok(router.includes("### Borders") && router.includes("### Lattice curation discipline"), "trailing sections reach R detail");
@@ -146,15 +148,16 @@ test("single source: one edit to a principle reaches every projection and nothin
   runCompile(root);
   const before = new Map(PROJECTIONS.map((name) => [name, generated(root, name)]));
   const path = join(root, "principles", "lattice.md");
-  const thesis = "Find the frame that shows it \u2014 relocate, do not reduce.*";
-  writeFileSync(path, readFileSync(path, "utf8").replace(thesis, "Find the frame that shows it.*"));
+  const line = "*Kernel:* Relocate, do not reduce: find the frame where the great sits at the humble point, and keep the load it must bear.";
+  assert.ok(readFileSync(path, "utf8").includes(line), "the pack's first kernel line");
+  writeFileSync(path, readFileSync(path, "utf8").replace(line, "*Kernel:* Find the frame that shows it."));
   const run = runCompile(root);
   assert.deepEqual(run.errors, []);
   for (const name of PROJECTIONS) {
     const text = generated(root, name);
     assert.notEqual(text, before.get(name), `${name} reflects the edit`);
-    assert.ok(text.includes("Find the frame that shows it. Failure mode: inversion without load."), name);
-    assert.ok(!text.includes("relocate, do not reduce"), `${name} carries no copy of the old text`);
+    assert.ok(text.includes("Find the frame that shows it."), name);
+    assert.ok(!text.includes("Relocate, do not reduce: find the frame"), `${name} carries no copy of the old text`);
   }
 });
 
@@ -196,7 +199,7 @@ test("fail loud: a principle without a failure mode fails the failure-mode rule 
 
 test("budgeted: a kernel over its hard cap is refused even with no previous size", (t) => {
   const root = tempDir(t);
-  plantHouse(root, { askFirst: Array.from({ length: 12 }, (_, k) => `Ask before step ${k}: ${"y".repeat(40)}`), purpose: "p".repeat(600) });
+  plantHouse(root, { askFirst: Array.from({ length: 30 }, (_, k) => `Ask before step ${k}: ${"y".repeat(60)}`), purpose: "p".repeat(600) });
   const run = runCompile(root);
   const kernel = run.compiled.manifest.surfaces.kernel;
   assert.ok(kernel.chars > 4000, `kernel measured ${kernel.chars}`);
@@ -303,9 +306,13 @@ test("in rules mode, raising a cap and growing its surface in one change is refu
   assert.match(run.errors[0].message, /its cap rises from 6000 to 8000 in the same change that grows it/);
 });
 
-test("the lattice text is carried verbatim into R detail", (t) => {
+test("the lattice text is carried verbatim into R detail, less the *Kernel:* lines the kernel already carries", (t) => {
   const root = tempDir(t);
   plantHouse(root);
   runCompile(root);
-  assert.ok(generated(root, "router.hermes.md").includes(LATTICE.trim()));
+  const router = generated(root, "router.hermes.md");
+  const detail = withoutKernelLines(LATTICE.replaceAll("\r\n", "\n")).trim();
+  assert.ok(router.includes(detail));
+  assert.ok(!router.includes("*Kernel:*"), "the detail repeats no kernel line");
+  assert.ok(LATTICE.includes("*Kernel:*") && detail.length < LATTICE.trim().length);
 });

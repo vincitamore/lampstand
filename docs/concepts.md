@@ -20,7 +20,7 @@ lampstand compiles the house's normative files into four projections in `.house/
 
 | Projection | Holds | Loaded by |
 |---|---|---|
-| Kernel | your purpose, one line per principle (its thesis and failure mode), the actions that always need asking first; at most 4,000 characters | every session and every subagent |
+| Kernel | your purpose, one line per principle (its `*Kernel:*` line, or else its thesis and failure mode), the actions that always need asking first; at most 4,000 characters | every session and every subagent |
 | Router | the kernel, then the full principles, the charter, the reflexes for this host (one line each, or in full with `[reflexes] router = "full"`), and voice | main sessions |
 | Worker | the kernel, then the reflexes for this host | subagents |
 | Watchdog | the kernel, then each principle's failure mode and the ask-first list | an OMP advisor, when you turn it on |

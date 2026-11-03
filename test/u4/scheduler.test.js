@@ -256,3 +256,19 @@ test("lampstand scheduler enable refuses while the scheduler module is off, befo
   assert.equal(out.enabled, false);
   assert.equal(existsSync(join(dir, "config-root", "lampstand", "seat.json")), false);
 });
+
+test("scheduler enable and disable are the operator's: refused from an agent's shell before anything is touched, status still answers", (t) => {
+  const dir = tempDir(t);
+  const root = join(dir, "house");
+  plant(root, { "house.toml": `${HOUSE_TOML}[modules]\nscheduler = true\n` });
+  const agent = { ...isolatedEnv(dir), LAMPSTAND_AGENT: "omp" };
+  for (const verb of ["enable", "disable"]) {
+    const result = lampstand(["scheduler", verb, ...(verb === "enable" ? ["--yes"] : []), "--json"], { cwd: root, env: agent });
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    const out = envelope(result.stdout);
+    assert.equal(out.error.code, "E_OPERATOR_ONLY");
+    assert.match(out.error.message, new RegExp(`^lampstand scheduler ${verb} waits for the operator: .*in a terminal`));
+  }
+  assert.equal(existsSync(join(dir, "config-root", "lampstand", "seat.json")), false, "nothing was recorded");
+  assert.equal(lampstand(["scheduler", "status", "--json"], { cwd: root, env: agent }).status, 0, "reading is not refused");
+});

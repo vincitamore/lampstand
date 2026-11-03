@@ -138,7 +138,7 @@ test("projections: an edited input, a deleted projection, an edited region, and 
 
 test("budgets: a kernel over the host envelope", SLOW, (t) => {
   const { env, root } = plantHouse(t);
-  const asks = Array.from({ length: 12 }, (_, k) => `"Ask before step ${k} of every release that touches the shared billing records."`);
+  const asks = Array.from({ length: 30 }, (_, k) => `"Ask before step ${k} of every release that touches the shared billing records."`);
   edit(root, "house.toml", 'ask_first = ["Ask before pushing to any remote."]', `ask_first = [${asks.join(", ")}]`);
   const report = doctor(env, root);
   const over = report.findings.filter((finding) => finding.code === "BUDGET_OVER_ENVELOPE");

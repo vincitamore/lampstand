@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { commitLine, commitOnly } from "../commit.js";
 import { fail } from "../errors.js";
+import { isAgentShell } from "../operator.js";
 import { WORKSPACE_FLAGS, resolveHouse } from "../root.js";
 import { actPaths, adoptItem, listProposals, propose, sizeLine, strikeItem, today } from "./curate.js";
 import { proposeHelp } from "./examples.js";
@@ -14,9 +15,6 @@ import { runCompile } from "./run.js";
 /** @typedef {import("../cli.js").VerbResult} VerbResult */
 /** @typedef {import("./curate.js").ProposedItem} ProposedItem */
 /** @typedef {import("./rules.js").Finding} Finding */
-
-/** The variable each host adapter sets in its agent's environment, so a verb can tell an agent's shell from the operator's. */
-export const AGENT_ENV = "LAMPSTAND_AGENT";
 
 /** Kinds only the operator adopts; reflexes are the one kind an agent may admit. */
 const OPERATOR_KINDS = ["principle/", "provision/"];
@@ -194,7 +192,7 @@ export const adoptVerb = {
     const shown = [];
     const ids = typeof context.flags.ids === "string" ? context.flags.ids.split(",").map((id) => id.trim()).filter((id) => id !== "") : null;
     // An agent's shell never gets the interactive loop: answering it would be the agent adopting for the operator.
-    const agent = (context.env[AGENT_ENV] ?? "") !== "";
+    const agent = isAgentShell(context.env);
     const interactive = ids === null && !agent && !context.json && process.stdin.isTTY === true && process.stdout.isTTY === true;
 
     if (interactive) {

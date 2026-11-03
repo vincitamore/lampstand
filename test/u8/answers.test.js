@@ -88,7 +88,8 @@ test("question 6 shows the default ask-first lines first; Keep? takes yes by def
 });
 
 test("the default lines count toward the kernel: a purpose too long beside them is asked again", async () => {
-  const talk = script(["", "", "", "", "x".repeat(450), "", "", "", "", "", "short"]);
+  const lines = Array.from({ length: 16 }, (_, k) => `Ask before doing the ${k}th thing on this long list: ${"z".repeat(50)}`);
+  const talk = script(["", "", "", "", "x".repeat(600), "", "", ...lines, "", "", "", "short"]);
   const { file } = await askAnswers(talk, options);
   assert.equal(file?.purpose, "short");
   assert.ok(talk.log.some((line) => /^show The kernel would be \d+ characters, \d+ over its cap of 4000/.test(line)));
