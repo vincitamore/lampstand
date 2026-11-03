@@ -6,9 +6,10 @@ import { commitLine, commitOnly } from "../commit.js";
 import { fail } from "../errors.js";
 import { isAgentShell } from "../operator.js";
 import { WORKSPACE_FLAGS, resolveHouse } from "../root.js";
-import { actPaths, adoptItem, listProposals, propose, sizeLine, strikeItem, today } from "./curate.js";
+import { propose, sizeLine, today } from "./curate.js";
 import { proposeHelp } from "./examples.js";
 import { KINDS } from "./parse.js";
+import { actPathsAny, adoptAny, listAllProposals, strikeAny } from "./updates.js";
 import { runCompile } from "./run.js";
 
 /** @typedef {import("../cli.js").VerbContext} VerbContext */
@@ -16,12 +17,14 @@ import { runCompile } from "./run.js";
 /** @typedef {import("./curate.js").ProposedItem} ProposedItem */
 /** @typedef {import("./rules.js").Finding} Finding */
 
-/** Kinds only the operator adopts; reflexes are the one kind an agent may admit. */
-const OPERATOR_KINDS = ["principle/", "provision/"];
+/** Kinds only the operator adopts; reflexes are the one kind an agent may admit. An update replaces a planted file (a charter, the lattice, the curation rules), so it is the operator's too. */
+const OPERATOR_KINDS = ["principle/", "provision/", "update/"];
 
 /** @param {string} id */
 function operatorOnly(id) {
-  return `${id} waits for the operator: principles and provisions are adopted by the operator, in a terminal or with /lampstand adopt`;
+  return id.startsWith("update/")
+    ? `${id} waits for the operator: an update to a planted file is adopted by the operator, in a terminal or with /lampstand adopt`
+    : `${id} waits for the operator: principles and provisions are adopted by the operator, in a terminal or with /lampstand adopt`;
 }
 
 /** @param {VerbContext} context */
@@ -102,9 +105,9 @@ export const compileVerb = {
 export async function adoptInteractively(root, talk, date) {
   /** @type {{ id: string, act: string, refused?: string }[]} */
   const acts = [];
-  for (const id of listProposals(root).map((item) => item.id)) {
+  for (const id of listAllProposals(root).map((item) => item.id)) {
     for (;;) {
-      const item = listProposals(root).find((candidate) => candidate.id === id);
+      const item = listAllProposals(root).find((candidate) => candidate.id === id);
       if (!item) break;
       talk.show(`\n=== ${item.id} (${item.path})\n${item.text}${item.text.endsWith("\n") ? "" : "\n"}--- ${sizeLine(item)}`);
       const answer = (await talk.ask("adopt, edit, strike or later? [later] ")).trim().toLowerCase();
@@ -113,13 +116,13 @@ export async function adoptInteractively(root, talk, date) {
         break;
       }
       if (answer === "a" || answer === "adopt") {
-        const refused = adoptItem(root, item, date);
+        const refused = adoptAny(root, item, date);
         acts.push(refused === null ? { id, act: "adopted" } : { id, act: "refused", refused });
         if (refused !== null) talk.show(`not adopted: ${refused}`);
         break;
       }
       if (answer === "s" || answer === "strike") {
-        strikeItem(root, item, date);
+        strikeAny(root, item, date);
         acts.push({ id, act: "struck" });
         break;
       }
@@ -151,7 +154,7 @@ export function settleActs(root, items, acts, env) {
   /** @type {string[]} */
   const paths = [];
   for (const [list, act] of /** @type {const} */ ([[adopted, "adopted"], [struck, "struck"]])) {
-    for (const { id } of list) paths.push(...actPaths(/** @type {ProposedItem} */ (byId.get(id)), act));
+    for (const { id } of list) paths.push(...actPathsAny(/** @type {ProposedItem} */ (byId.get(id)), act));
   }
   paths.push(...(compiled?.written ?? []));
   const message = [adopted.length > 0 ? `Adopt ${adopted.map((act) => act.id).join(", ")}` : "", struck.length > 0 ? `Strike ${struck.map((act) => act.id).join(", ")}` : ""]
@@ -178,15 +181,15 @@ function terminalConversation(env, rl) {
 /** @type {import("../cli.js").Verb} */
 export const adoptVerb = {
   name: "adopt",
-  summary: "show every proposed item verbatim with its size; adopt, edit, strike or leave it for later (default later); what is adopted or struck is committed",
+  summary: "show every proposed item verbatim with its size (including updates to planted files after an upgrade, as update/<path>); adopt, edit, strike or leave it for later (default later); what is adopted or struck is committed",
   flags: {
     ...WORKSPACE_FLAGS,
-    ids: { type: "string", summary: "adopt exactly these items, comma-separated <kind>/<slug>, without asking" },
+    ids: { type: "string", summary: "adopt exactly these items, comma-separated, without asking: <kind>/<slug>, or update/<path> for an update to a planted file (update/principles/lattice.md)" },
   },
   async run(context) {
     const root = houseRoot(context);
     const date = today();
-    const items = listProposals(root);
+    const items = listAllProposals(root);
     /** @type {{ id: string, act: string, refused?: string, code?: string }[]} */
     let acts = [];
     const shown = [];
@@ -213,7 +216,7 @@ export const adoptVerb = {
             acts.push({ id, act: "refused", refused: operatorOnly(id), code: "E_OPERATOR_ONLY" });
             continue;
           }
-          const refused = adoptItem(root, /** @type {ProposedItem} */ (byId.get(id)), date);
+          const refused = adoptAny(root, /** @type {ProposedItem} */ (byId.get(id)), date);
           acts.push(refused === null ? { id, act: "adopted" } : { id, act: "refused", refused });
         }
       }

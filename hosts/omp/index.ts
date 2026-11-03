@@ -16,7 +16,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { runCli } from "../../core/lib/cli.js";
 import { GENERATED_DIR, projectionMarker, readHeader } from "../../core/lib/constitution/compile.js";
-import { listProposals, today } from "../../core/lib/constitution/curate.js";
+import { today } from "../../core/lib/constitution/curate.js";
+import { listAllProposals } from "../../core/lib/constitution/updates.js";
 import { inputHash, readInputs } from "../../core/lib/constitution/house.js";
 import { adoptInteractively, settleActs } from "../../core/lib/constitution/verbs.js";
 import { commitLine } from "../../core/lib/commit.js";
@@ -347,7 +348,7 @@ export default function lampstand(pi: HostApi): void {
       send(`lampstand: E_NO_HOUSE: no house resolved from ${ctx.cwd}`);
       return;
     }
-    const items = listProposals(root);
+    const items = listAllProposals(root);
     const acts = await adoptInteractively(
       root,
       {
