@@ -19,5 +19,5 @@
     "packs/**",
     "docs/**"
   ],
-  "exclude": []
+  "exclude": ["docs/assets/*.svg"]
 }

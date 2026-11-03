@@ -39,6 +39,7 @@
     "schema/",
     "templates/",
     "packs/",
-    "docs/"
+    "docs/",
+    "!docs/assets/*.svg"
   ]
 }
