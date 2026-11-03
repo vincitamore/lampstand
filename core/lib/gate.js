@@ -63,7 +63,7 @@ export const MAINTENANCE = /** @type {Maintenance} */ (
   JSON.parse(readFileSync(new URL("../../schema/maintenance.json", import.meta.url), "utf8"))
 );
 
-/** Trigger matching any changed path outside the record folders, in or out of the house. */
+/** Trigger matching any changed path outside the record folders and the other triggers, in or out of the house. */
 const WORK = "work";
 
 /**
@@ -95,8 +95,11 @@ function matches(rel, pattern) {
 export function evaluateGate(root, changed, mode, maintenance = MAINTENANCE) {
   if (mode === "off") return { mode, owed: [], block: null };
   const paths = changed.map((path) => ({ path, rel: houseRelative(root, path) }));
+  // A path some obligation names in particular (reflexes/, charter/core.md, ...) owes that obligation, not the generic
+  // task and state record, so only a path nothing names is work.
+  const named = maintenance.obligations.flatMap((obligation) => obligation.triggers.filter((trigger) => trigger !== WORK));
   /** @param {string | null} rel */
-  const isWork = (rel) => rel === null || !maintenance.record_folders.some((folder) => matches(rel, folder));
+  const isWork = (rel) => rel === null || !(maintenance.record_folders.some((folder) => matches(rel, folder)) || named.some((trigger) => matches(rel, trigger)));
   /** @type {Owed[]} */
   const owed = [];
   for (const obligation of maintenance.obligations) {

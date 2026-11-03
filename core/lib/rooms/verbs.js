@@ -6,11 +6,12 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { askOnce } from "../cli.js";
+import { commitLine, commitOnly } from "../commit.js";
 import { loadHouseConfig } from "../config.js";
 import { today } from "../constitution/curate.js";
 import { fail } from "../errors.js";
 import { readText } from "../io.js";
-import { fullPath } from "../init/plant.js";
+import { fullPath, PLANTED_FILE } from "../init/plant.js";
 import { resolveHouse } from "../root.js";
 import { commandRunner } from "../doctor/util.js";
 import { AGORA_FLOOR, AGORA_INSTALL, agoraExtension, agoraProblemText, detectAgora } from "./agora.js";
@@ -103,7 +104,7 @@ export const roomsVerb = {
 /** @type {Verb} */
 export const roomsEnableVerb = {
   name: "rooms enable",
-  summary: "seed rooms/ and propose the rooms provision once [modules] rooms is on (lists the changes and asks once)",
+  summary: "seed rooms/ and propose the rooms provision once [modules] rooms is on (lists the changes, asks once, commits them)",
   flags: { yes: { type: "boolean", summary: "make the listed changes without asking" } },
   run(context) {
     return enableRooms(context, roomsTemplates(), context.flags.yes ? () => true : askOnce);
@@ -151,13 +152,24 @@ export async function enableRooms(context, templates, confirm) {
   for (const rel of done.seeded) lines.push(`planted ${rel}`);
   if (done.proposed !== null) lines.push(`proposed ${done.proposed}: adopt it with lampstand adopt`);
   if (done.proposalRefused !== null) lines.push(`provision not proposed: ${done.proposalRefused}`);
+  // Exactly what enabling wrote: the seeded examples, planted.json, the proposal and any recompiled projection.
+  const message = "Enable rooms";
+  const commit = commitOnly(root, [...done.seeded, ...(done.seeded.length > 0 ? [PLANTED_FILE] : []), ...(done.proposed === null ? [] : [done.proposed]), ...done.compile.written], message, context.env);
   const refused = done.compile.errors.length > 0;
   if (refused) lines.push(`compile refused, projections unchanged; run lampstand compile:\n${done.compile.errors.map((line) => `  ${line}`).join("\n")}`);
   else if (done.compile.written.length > 0) lines.push(`recompiled (${done.compile.written.length} files written)`);
+  lines.push(commitLine(commit, message));
   return {
     ok: !refused,
     exit: refused ? 1 : 0,
-    data: { ...base, enabled: true, changed: true, ...done },
+    data: {
+      ...base,
+      enabled: true,
+      changed: true,
+      ...done,
+      commit: commit.status === "committed" ? commit.sha : null,
+      uncommitted: commit.status === "uncommitted" ? { reason: commit.reason, command: commit.command } : null,
+    },
     text: `${lines.join("\n")}\n${next}`,
   };
 }

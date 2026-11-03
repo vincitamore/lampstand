@@ -1,6 +1,6 @@
 // @ts-check
 import assert from "node:assert/strict";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { adoptItem, listProposals, propose, readRecord } from "../../core/lib/constitution/curate.js";
@@ -156,4 +156,21 @@ test("from an agent's shell (LAMPSTAND_AGENT set) adopt --ids refuses principles
   const operator = lampstand(["adopt", "--ids", "provision/commit-as-it-lands"], { cwd: s.root, env: s.env });
   assert.equal(operator.status, 0, operator.stdout + operator.stderr);
   assert.ok(existsSync(join(s.root, "charter", "provisions", "commit-as-it-lands.md")));
+});
+
+test("propose finalizes a draft already written at its destination, and still refuses one that carries an occasion", (t) => {
+  const s = setup(t);
+  plant(s.root, { "proposals/provisions/test-with-every-bugfix.md": "# Test with every bugfix\n\nA fix lands with the test that failed before it.\n" });
+  const inPlace = "proposals/provisions/test-with-every-bugfix.md";
+  const first = s.run(["propose", "provision", inPlace, "--occasion", "a fix shipped untested", "--json"]);
+  assert.equal(first.status, 0, first.stdout + first.stderr);
+  assert.equal(envelope(first.stdout).path, inPlace);
+  const text = readFileSync(join(s.root, inPlace), "utf8");
+  assert.match(text, /^---\noccasion: "a fix shipped untested"\nproposed: "\d{4}-\d{2}-\d{2}"\n---\n# Test with every bugfix\n/);
+  assert.equal(listProposals(s.root).length, 1);
+
+  const again = s.run(["propose", "provision", inPlace, "--occasion", "another", "--json"]);
+  assert.equal(again.status, 1);
+  assert.match(envelope(again.stdout).refused, /already proposed/);
+  assert.equal(readFileSync(join(s.root, inPlace), "utf8"), text, "the filed proposal is untouched");
 });

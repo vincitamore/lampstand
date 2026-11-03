@@ -162,3 +162,36 @@ test("every error code has a one-line meaning and a contract exit code", () => {
     assert.ok([1, 2, 64, 70].includes(spec.exit), code);
   }
 });
+
+test("a command group alone lists its subcommands: --help exits 0, bare or mistyped exits 64 with the same list", async () => {
+  const registry = new Registry().register(
+    { name: "decide new", summary: "open a decision", run: () => ({ text: "" }) },
+    { name: "decide resolve", summary: "resolve a decision", run: () => ({ text: "" }) },
+    { name: "rooms", summary: "explain rooms", run: () => ({ text: "" }) },
+    { name: "rooms status", summary: "agora's version", run: () => ({ text: "" }) },
+  );
+  /** @param {string[]} argv */
+  const call = async (argv) => {
+    const stdout = sink();
+    const stderr = sink();
+    const code = await runCli(registry, argv, { stdout, stderr, env: {}, cwd: "." });
+    return { code, stdout: stdout.text(), stderr: stderr.text() };
+  };
+  const help = await call(["decide", "--help"]);
+  assert.equal(help.code, 0);
+  assert.match(help.stdout, /^usage: lampstand decide <subcommand>[^\n]*\n\nsubcommands:\n {2}decide new {6}open a decision\n {2}decide resolve {2}resolve a decision\n/);
+  assert.equal(JSON.parse((await call(["decide", "--help", "--json"])).stdout).ok, true);
+
+  const bare = await call(["decide"]);
+  assert.equal(bare.code, 64);
+  assert.match(bare.stderr, /needs a subcommand[\s\S]*decide resolve {2}resolve a decision/);
+  const typo = await call(["decide", "resolv"]);
+  assert.equal(typo.code, 64);
+  assert.match(typo.stderr, /unknown subcommand "decide resolv"[\s\S]*decide new/);
+  assert.equal((await call(["nope"])).code, 64);
+
+  // A verb that is also a group keeps its own help and gains the subcommand list.
+  const rooms = await call(["rooms", "--help"]);
+  assert.equal(rooms.code, 0);
+  assert.match(rooms.stdout, /explain rooms[\s\S]*subcommands:\n {2}rooms status {2}agora's version/);
+});

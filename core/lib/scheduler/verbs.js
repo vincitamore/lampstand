@@ -4,6 +4,7 @@
 import { join } from "node:path";
 import { askOnce } from "../cli.js";
 import { fail } from "../errors.js";
+import { jobHelp } from "../governance/example.js";
 import { loadHouse } from "../governance/jobs.js";
 import { WORKSPACE_FLAGS, resolveHouse } from "../root.js";
 import { stateDirFor } from "../state/paths.js";
@@ -153,7 +154,9 @@ export function schedulerStatus({ house, host }) {
 /** @type {Verb} */
 export const schedulerEnableVerb = {
   name: "scheduler enable",
-  summary: "register this house's one OS scheduler entry (lists it and asks once)",
+  summary: "register this house's one OS scheduler entry (lists it and asks once); needs [modules] scheduler = true",
+  more: jobHelp,
+  groupNote: jobHelp,
   flags: { yes: { type: "boolean", summary: "create the listed entries without asking (for CI)" }, ...HOUSE_FLAG },
   run(context) {
     const house = houseFor(context);

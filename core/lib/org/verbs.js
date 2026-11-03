@@ -141,7 +141,7 @@ function transitionData(done) {
  */
 function runTransition(context, select, what, change) {
   const { root, schema } = open(context);
-  const item = findItem(itemsOf(root, schema, select(schema)), context.args[0], what);
+  const item = findItem(itemsOf(root, schema, select(schema)), context.args[0], what, schema);
   const done = transition(root, schema, item, { status: change.status ?? text(context, "status"), resolution: text(context, "resolution"), fields: change.fields });
   return { data: transitionData(done), text: transitionText(done) };
 }

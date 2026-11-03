@@ -156,23 +156,57 @@ export function stemOfItem(item) {
   return item.rel.slice(item.rel.lastIndexOf("/") + 1, -3);
 }
 
+/** Edit distance between two short strings. @param {string} a @param {string} b */
+function distance(a, b) {
+  let row = Array.from({ length: b.length + 1 }, (_, k) => k);
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j++) next[j] = Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    row = next;
+  }
+  return row[b.length];
+}
+
 /**
- * The one item of `kinds` that `ref` names: a file stem, a file name, or a house-relative path.
+ * The one item of `items` that `ref` names: a file stem, a file name or a house-relative path; failing that, a title
+ * (case-insensitive, whitespace-collapsed) or text that slugifies to a stem. A ref that names nothing gets the closest
+ * stems in the message; one that names several lists them.
  * @param {ItemFile[]} items
  * @param {string} ref
  * @param {string} what  how the caller names the kinds, for messages
+ * @param {OrgSchema} schema  reads each item's title
  */
-export function findItem(items, ref, what) {
+export function findItem(items, ref, what, schema) {
   const wanted = ref.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\.md$/i, "").toLowerCase();
-  const matches = items.filter((item) => {
+  const exact = items.filter((item) => {
     const rel = item.rel.slice(0, -3).toLowerCase();
     return wanted.includes("/") ? rel === wanted : stemOfItem(item).toLowerCase() === wanted;
   });
-  if (matches.length === 0) throw fail("E_USAGE", `no ${what} named ${JSON.stringify(ref)}`);
-  if (matches.length > 1) {
-    throw fail("E_USAGE", `${JSON.stringify(ref)} names more than one ${what}: ${matches.map((item) => item.rel).join(", ")}; give the path`);
+  if (exact.length > 1) {
+    throw fail("E_USAGE", `${JSON.stringify(ref)} names more than one ${what}: ${exact.map((item) => item.rel).join(", ")}; give the path`);
   }
-  return matches[0];
+  if (exact.length === 1) return exact[0];
+
+  const title = ref.trim().replace(/\s+/g, " ").toLowerCase();
+  const slug = slugify(ref);
+  const named = items.filter((item) => {
+    const own = titleOf(item, schema);
+    return (own !== undefined && own.trim().replace(/\s+/g, " ").toLowerCase() === title) || (slug !== "" && stemOfItem(item).toLowerCase() === slug);
+  });
+  if (named.length === 1) return named[0];
+  if (named.length > 1) {
+    throw fail("E_USAGE", `${JSON.stringify(ref)} names more than one ${what}: ${named.map((item) => item.rel).join(", ")}; give the path`);
+  }
+  const target = slug === "" ? wanted : slug;
+  const limit = Math.max(3, Math.ceil(target.length * 0.4));
+  const close = [...new Set(items.map(stemOfItem))]
+    .map((stem) => ({ stem, score: distance(target, stem.toLowerCase()) }))
+    .filter(({ score }) => score <= limit)
+    .sort((a, b) => a.score - b.score || (a.stem < b.stem ? -1 : 1))
+    .slice(0, 3)
+    .map(({ stem }) => stem);
+  const hint = close.length === 0 ? "" : `; did you mean ${close.join(", ")}?`;
+  throw fail("E_USAGE", `no ${what} named ${JSON.stringify(ref)}${hint}`);
 }
 
 /**

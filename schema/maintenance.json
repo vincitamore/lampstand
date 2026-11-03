@@ -1,7 +1,7 @@
 {
-  "$comment": "What a session may owe the house when it ends, read by core/lib/gate.js. An obligation is owed when a changed path matches one of its triggers and no changed path lies under its folder (the place that receives it). A trigger ending in / matches everything under that folder, any other trigger matches one exact path, and the trigger \"work\" matches any changed path outside record_folders, including paths outside the house. Paths are house-relative with forward slashes.",
+  "$comment": "What a session may owe the house when it ends, read by core/lib/gate.js. An obligation is owed when a changed path matches one of its triggers and no changed path lies under its folder (the place that receives it). A trigger ending in / matches everything under that folder, any other trigger matches one exact path, and the trigger \"work\" matches any changed path outside record_folders and outside every other trigger of every obligation (a constitution file owes its own obligation, not a task and a state note), including paths outside the house. Paths are house-relative with forward slashes.",
   "version": 1,
-  "record_folders": ["tasks/", "inbox/", "knowledge/", "reminders/", "state/", "forge/", ".house/"],
+  "record_folders": ["tasks/", "inbox/", "knowledge/", "reminders/", "state/", "forge/", ".house/", "proposals/", "charter/record.md"],
   "obligations": [
     {
       "id": "projections",

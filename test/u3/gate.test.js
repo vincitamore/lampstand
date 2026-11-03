@@ -36,6 +36,22 @@ test("a constitution change owes a compile unless .house/generated/ changed too"
   assert.deepEqual(ids(evaluateGate(root, ["charter/record.md", "tasks/t.md", "state/current.md"], "remind")), []);
 });
 
+test("a session whose only act was a proposal or the record owes nothing", (t) => {
+  const { root } = makeHouse(t);
+  assert.deepEqual(ids(evaluateGate(root, ["proposals/provisions/test-with-every-bugfix.md"], "block")), []);
+  assert.deepEqual(ids(evaluateGate(root, ["proposals/updates/curation.md", "charter/record.md"], "block")), []);
+});
+
+test("a constitutional file owes projections only, and nothing once .house/generated/ changed too; code still owes a task and state", (t) => {
+  const { root } = makeHouse(t);
+  for (const path of ["reflexes/read-first.md", "principles/own.md", "charter/core.md", "charter/provisions/x.md", "voice.md", "house.toml"]) {
+    assert.deepEqual(ids(evaluateGate(root, [path], "remind")), ["projections"], path);
+    assert.deepEqual(ids(evaluateGate(root, [path, ".house/generated/kernel.md"], "remind")), [], path);
+  }
+  assert.deepEqual(ids(evaluateGate(root, ["reflexes/read-first.md", "src/x.js"], "remind")), ["projections", "task", "state"]);
+  assert.deepEqual(evaluateGate(root, ["reflexes/read-first.md", "src/x.js"], "remind").owed[1].because, ["src/x.js"]);
+});
+
 test("block mode turns what is owed into a reason; off owes nothing", (t) => {
   const { root } = makeHouse(t);
   const blocked = evaluateGate(root, ["src/x.js"], "block");

@@ -127,3 +127,35 @@ test("lists show open items by default and resolved ones with --all", async (t) 
   const reminders = await cliJson(["remind", "list"], house);
   assert.equal(reminders.body.items[0].overdue, true);
 });
+
+test("an item is named by its title, case-insensitively, or by text that slugifies to its stem; a near miss lists the closest stems", async (t) => {
+  const house = makeHouse(t);
+  for (const title of ["Query result shape", "Pick a storage format", "Pick a storage engine"]) {
+    assert.equal((await cliJson(["decide", "new", title], house)).code, 0);
+  }
+  const byTitle = await cliJson(["decide", "resolve", "query RESULT shape", "--resolution", "Landed in [[x]]"], house);
+  assert.equal(byTitle.code, 0, JSON.stringify(byTitle.body));
+  assert.equal(byTitle.body.to, "inbox/decisions/resolved/query-result-shape.md");
+
+  const bySlugified = await cliJson(["decide", "resolve", "Pick a storage format!", "--resolution", "Landed in [[x]]"], house);
+  assert.equal(bySlugified.code, 0, JSON.stringify(bySlugified.body));
+  assert.equal(bySlugified.body.to, "inbox/decisions/resolved/pick-a-storage-format.md");
+
+  const miss = await cliJson(["decide", "resolve", "Pick a storage engin", "--resolution", "Landed in [[x]]"], house);
+  assert.equal(miss.code, 64);
+  assert.match(miss.body.error.message, /no decision named "Pick a storage engin"; did you mean pick-a-storage-engine[,?]/);
+  const far = await cliJson(["decide", "resolve", "Something else entirely", "--resolution", "Landed in [[x]]"], house);
+  assert.equal(far.body.error.message, 'no decision named "Something else entirely"');
+});
+
+test("a title that names two items is refused with both listed", async (t) => {
+  const house = makeHouse(t);
+  plant(house.root, {
+    "tasks/a.md": '---\nkind: task\ntitle: Ship it\nstatus: open\ncreated: "2026-01-01"\n---\n',
+    "tasks/b.md": '---\nkind: task\ntitle: ship IT\nstatus: open\ncreated: "2026-01-01"\n---\n',
+  });
+  const result = await cliJson(["task", "done", "Ship it", "--resolution", "Landed in [[x]]"], house);
+  assert.equal(result.code, 64);
+  assert.match(result.body.error.message, /names more than one task: tasks\/a\.md, tasks\/b\.md; give the path/);
+  assert.equal((await cliJson(["task", "done", "a", "--resolution", "Landed in [[x]]"], house)).code, 0);
+});

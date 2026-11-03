@@ -55,6 +55,6 @@ or `Strike <kind>/<slug>`, naming each item; when every item is left for later, 
 
 Nothing runs on its own until you turn it on:
 
-- **Jobs:** declare them in `house.toml [jobs]`, set `[modules] scheduler = true`, then `lampstand scheduler enable`
+- **Jobs:** declare them in `house.toml [jobs]` (`lampstand run --help` shows the shape), set `[modules] scheduler = true`, then `lampstand scheduler enable`
   lists the one OS entry it will create and asks before creating it.
-- **Rooms:** install agora, set `[modules] rooms = true`, then `lampstand rooms enable`.
+- **Rooms:** install agora, set `[modules] rooms = true`, then `lampstand rooms enable`, which commits what it seeds and proposes.

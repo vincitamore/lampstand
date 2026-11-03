@@ -91,3 +91,14 @@ test("due: an every job is due once its interval (less the slack) has passed; a 
   assert.equal(isDue(daily, null, now - minutes(15), now), false, "never run: not due when its time did not fall since the last tick");
   assert.equal(isDue(/** @type {any} */ (job.get("m")), null, 0, now), false, "a job without a schedule runs only by hand");
 });
+
+test("the job example shown by run --help is a valid declaration, and the help names the required keys and the module", async (t) => {
+  const { JOB_EXAMPLE, jobHelp } = await import("../../core/lib/governance/example.js");
+  const root = houseWith(t, `${JOB_EXAMPLE}\n`);
+  const house = loadHouse(root);
+  const job = /** @type {import("../../core/lib/governance/jobs.js").Job} */ (house.jobs.get("nightly-report"));
+  assert.deepEqual([job.argv, job.staleHours, job.outputs, job.mutates, job.commit], [["node", "scripts/report.js"], 36, ["state/reports"], ["state/current.md"], true]);
+  assert.equal(job.schedule?.text, "at 02:30");
+  assert.match(jobHelp(), /Required: argv and stale_hours/);
+  assert.match(jobHelp(), /\[modules\] scheduler = true/);
+});

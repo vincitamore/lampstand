@@ -3,7 +3,7 @@
 // constitution with its provenance (adopted date and the content hash of its body) and records the act in
 // charter/record.md. Striking removes the proposal and records its body hash, which is how a struck item is kept
 // from being proposed again until its text changes.
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fail } from "../errors.js";
 import { parseFrontmatter } from "../frontmatter.js";
@@ -201,7 +201,9 @@ function checkProposalName(name, path) {
 
 /**
  * Files a proposal from a draft. The draft's own frontmatter is kept except the keys propose and adopt set; the
- * occasion and proposed date are added. Returns the proposal's house-relative path, or a refusal reason.
+ * occasion and proposed date are added. A draft already written at its destination, with no occasion yet, is
+ * finalized in place; one that carries an occasion is already proposed. Returns the proposal's house-relative path, or
+ * a refusal reason.
  * @param {string} root
  * @param {Kind} kind
  * @param {string} draftPath  absolute
@@ -229,7 +231,10 @@ export function propose(root, kind, draftPath, occasion, date) {
   const struck = readRecord(root).find((entry) => entry.act === "struck" && entry.kind === kind && entry.hash === hash);
   if (struck) return { refused: `this text was struck as ${kind}/${struck.slug} on ${struck.date}; it is not proposed again unless its text changes` };
   const slug = name.replace(/\.md$/, "");
-  if (existsSync(dest)) return { refused: `${destRel} is already proposed` };
+  const inPlace = existsSync(dest) && realpathSync.native(dest) === realpathSync.native(draftPath);
+  const occasionHere = parsed.frontmatter?.occasion;
+  const finalizing = inPlace && !(typeof occasionHere === "string" && occasionHere.trim() !== "");
+  if (existsSync(dest) && !finalizing) return { refused: `${destRel} is already proposed` };
   const adoptedRel = `${KIND_DIRS[kind].adopted}/${name}`;
   if (existsSync(full(root, adoptedRel))) return { refused: `${adoptedRel} is already adopted; choose another name for ${kind}/${slug}` };
   mkdirSync(dirname(dest), { recursive: true });

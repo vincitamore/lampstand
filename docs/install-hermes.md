@@ -30,7 +30,8 @@ hermes
 ## Upgrading
 
 `hermes plugins update lampstand` brings the plugin to the latest release; your house is untouched. Then run
-`lampstand upgrade` in the house to migrate it.
+`lampstand upgrade` in the house to migrate it; it commits exactly what it changed, as
+`Upgrade the house to lampstand <version>`.
 
 ## What the plugin does in a session
 

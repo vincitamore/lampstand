@@ -47,7 +47,8 @@ Run `lampstand <verb> --help` for flags; add `--json` for one machine-readable o
   adds `occasion` and `proposed` to the frontmatter itself.
 - **Pipelines:** `forge new|log|status` (see the orchestrate skill).
 - **Jobs:** `run <job>`, `run --status`, `tick`, `scheduler enable|disable|status` (the scheduler is off until the
-  operator turns it on).
+  operator turns it on with `[modules] scheduler = true`). A job is a `[jobs.<id>]` table in house.toml with `argv` and
+  `stale_hours` required, and `every`, `at`, `outputs`, `mutates`, `commit` optional; `run --help` shows an example.
 - **The house itself:** `init`, `upgrade`, `doctor`, `seat status|reset`, `root`, `gate`.
 
 ## Rules that hold every session
@@ -71,5 +72,6 @@ Run `lampstand <verb> --help` for flags; add `--json` for one machine-readable o
 
 The maintenance gate (`lampstand gate <changed paths>`, run by your host for you) lists what the session owes: a task
 updated or resolved, `state/current.md` brought up to date, a reusable lesson written to `knowledge/`, a decision filed
-in `inbox/decisions/` with its options, a resolution recorded. Do each, or say plainly why it is not owed. In `block`
+in `inbox/decisions/` with its options, a resolution recorded. A proposal owes none of these, and a changed
+constitution file owes only `lampstand compile`. Do each that is owed, or say plainly why it is not owed. In `block`
 mode the session cannot end until the list is empty.

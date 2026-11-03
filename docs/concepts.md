@@ -61,7 +61,8 @@ without a host limit on OMP.
 ## The maintenance gate
 
 Before a session ends, lampstand checks what the session changed (through git, so work done through any tool counts)
-and lists what it owes the house: a task updated or resolved, current state written down, a lesson kept. In `remind`
+and lists what it owes the house: a task updated or resolved, current state written down, a lesson kept. Filing a proposal or
+recording an adoption owes none of that, and a change to a constitution file owes only a `lampstand compile`. In `remind`
 mode it reminds once; in `block` mode the session cannot end until the list is empty.
 
 ## Jobs

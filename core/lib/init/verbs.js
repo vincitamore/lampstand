@@ -1,5 +1,5 @@
 // @ts-check
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { hasHouseToml } from "../config.js";
 import { fail } from "../errors.js";
@@ -8,8 +8,9 @@ import { today } from "../constitution/curate.js";
 import { answersFrom, askAnswers, kernelFit, kernelFitText, readAnswersFile } from "./answers.js";
 import { commitLine } from "../commit.js";
 import { initHouse, PLANT_MESSAGE } from "./init.js";
+import { PACKAGE_ROOT } from "./plant.js";
 import { regionProblem } from "./region.js";
-import { upgradeHouse } from "./upgrade.js";
+import { upgradeHouse, upgradeMessage } from "./upgrade.js";
 
 /** @typedef {import("../cli.js").Verb} Verb */
 /** @typedef {import("../constitution/rules.js").Finding} Finding */
@@ -167,7 +168,7 @@ export const initVerb = {
       git,
       ...compile.lines,
       ...(result.defaultHouse === null ? [] : [result.defaultHouse.changed ? `default_house set in ${result.defaultHouse.path} (seat ledger records the earlier value)` : `default_house already names this house`]),
-      `starter jobs proposed, not declared (add one to house.toml [jobs] to use it): ${result.proposedJobs.map((job) => job.id).join(", ")}`,
+      `starter jobs proposed, not declared: ${result.proposedJobs.map((job) => job.id).join(", ")}; copy one from ${join(PACKAGE_ROOT, "templates", "jobs")} into house.toml (lampstand run --help shows the shape)`,
     ];
     const actionable = compile.actionable || result.git === "unavailable";
     return {
@@ -195,7 +196,7 @@ export const initVerb = {
 /** @type {Verb} */
 export const upgradeVerb = {
   name: "upgrade",
-  summary: "migrate the house to this lampstand: back up, migrate, recompile; an edited planted file gets a proposal",
+  summary: "migrate the house to this lampstand: back up, migrate, recompile, commit what changed; an edited planted file gets a proposal",
   flags: WORKSPACE_FLAGS,
   run(context) {
     const found = resolveHouse({ env: context.env, cwd: context.cwd, workspace: !context.flags["no-workspace"] });
@@ -210,6 +211,7 @@ export const upgradeVerb = {
       ...listing("planted (new in this lampstand)", result.planted),
       ...listing("proposed (edited here, left as they are)", result.proposed),
       ...compile.lines,
+      commitLine(result.commit, upgradeMessage()),
     ];
     return {
       ok: !compile.actionable,
@@ -223,6 +225,8 @@ export const upgradeVerb = {
         proposed: result.proposed,
         compile: result.compile,
         region: result.region,
+        commit: result.commit.status === "committed" ? result.commit.sha : null,
+        uncommitted: result.commit.status === "uncommitted" ? { reason: result.commit.reason, command: result.commit.command } : null,
       },
       text: lines.join("\n"),
     };

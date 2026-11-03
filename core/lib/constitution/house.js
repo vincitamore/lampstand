@@ -7,12 +7,16 @@
 // directory, files are taken in code point order of their house-relative path, and the hash is sha256 over the
 // UTF-8 of `<path>\n<content-hash>\n` per present file, where content-hash is io.js contentHash. A Python loader
 // recomputes it from the header alone; schema/constitution/input-hash.json pins the definition for both.
+//
+// house.toml is hashed as the compiler reads it, not byte for byte: the tables no projection is built from (see
+// UNPROJECTED_TABLES) and every comment-only or blank line are left out, so declaring a job or turning a module on
+// does not make the projections stale. The rule is line-based on purpose, so the Python loader needs no TOML parser.
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { loadHouseConfig } from "../config.js";
 import { parseFrontmatter } from "../frontmatter.js";
-import { contentHash, readText } from "../io.js";
+import { contentHash, normalizeLf, readText, stripBom } from "../io.js";
 import {
   askFirstLines,
   KINDS,
@@ -34,6 +38,37 @@ export const INPUT_SPECS = Object.freeze([
   "reflexes/*.md",
   "voice.md",
 ]);
+
+/**
+ * The house.toml tables the compiler never reads. Everything else in house.toml is hashed, so a key the compiler
+ * starts to read later is covered by default; a key in one of these tables must not be read by it.
+ */
+export const UNPROJECTED_TABLES = Object.freeze(["jobs", "modules", "gate"]);
+
+/**
+ * The text of a file as the input hash sees it: the file itself, except house.toml, which loses its unprojected
+ * tables (a header line `[name...]` or `[[name...]]` whose first key is one of UNPROJECTED_TABLES, and the lines up to
+ * the next header) and every blank or `#` comment line. A header's first key is the text after the brackets and
+ * blanks up to the next `.`, `]` or blank, with one pair of surrounding quotes removed.
+ * @param {string} path  house-relative
+ * @param {string} text  LF-normalized, without a BOM
+ */
+export function hashedText(path, text) {
+  if (path !== "house.toml") return text;
+  let skipping = false;
+  /** @type {string[]} */
+  const kept = [];
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed === "" || trimmed.startsWith("#")) continue;
+    if (trimmed.startsWith("[")) {
+      const first = trimmed.replace(/^\[+[ \t]*/, "").split(/[.\] \t]/, 1)[0].replace(/^(["'])(.*)\1$/, "$2");
+      skipping = UNPROJECTED_TABLES.includes(first);
+    }
+    if (!skipping) kept.push(line);
+  }
+  return kept.length === 0 ? "" : `${kept.join("\n")}\n`;
+}
 
 /** Where each kind waits before adoption, and where adoption moves it. */
 export const KIND_DIRS = Object.freeze({
@@ -95,7 +130,7 @@ export function readInputs(root) {
 /** @param {{ path: string, text: string }[]} inputs */
 export function inputHash(inputs) {
   const hash = createHash("sha256");
-  for (const input of inputs) hash.update(`${input.path}\n${contentHash(input.text)}\n`, "utf8");
+  for (const input of inputs) hash.update(`${input.path}\n${contentHash(hashedText(input.path, normalizeLf(stripBom(input.text))))}\n`, "utf8");
   return hash.digest("hex");
 }
 

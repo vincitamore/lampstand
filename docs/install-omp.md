@@ -22,7 +22,8 @@ omp
 ## Upgrading
 
 Install the new tag the same way; OMP replaces the plugin and keeps your house untouched. Then run
-`lampstand upgrade` in the house to migrate it.
+`lampstand upgrade` in the house to migrate it; it commits exactly what it changed, as
+`Upgrade the house to lampstand <version>`.
 
 ## Checking the install
 

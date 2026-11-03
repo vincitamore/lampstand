@@ -6,8 +6,14 @@ Found by running a house day to day with a live model.
 
 - The maintenance gate charges a session only for what it changed. Work an earlier session left uncommitted was
   owed again by every session after it.
-- `lampstand init` commits what it planted, and `lampstand adopt` commits what it adopted or struck, each touching
-  only the paths it wrote. When git cannot commit, the files stay as written and the command to commit is printed.
+- `lampstand init`, `adopt`, `upgrade` and `rooms enable` commit what they wrote, touching only those paths. When git
+  cannot commit, the files stay as written and the command to commit is printed.
+- Filing a proposal or admitting a reflex no longer owes a task and a state note at the end of a session.
+- Editing `[jobs]`, `[modules]` or `[gate]` in `house.toml` no longer marks the projections stale. The input hash
+  changes once for every house; `lampstand upgrade` recompiles.
+- `lampstand <group> --help` lists the group's subcommands, and items can be named by their title.
+- `propose` finalizes a draft already in its proposals folder.
+- `run --help` shows how to declare a job.
 - Principles and provisions are adopted by the operator: `adopt` refuses them from an agent's shell, which each host
   adapter marks with `LAMPSTAND_AGENT`. Reflexes stay the agent's to admit.
 - Outside a house the plugin is silent. Installed for every session, it used to print a line in each one.

@@ -5,6 +5,7 @@ A Hermes loader verifies a projection by recomputing this hash; these vectors pi
 
 import hashlib
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -19,6 +20,25 @@ def content_hash(raw: bytes) -> str:
     if text.startswith("\ufeff"):
         text = text[1:]
     return hashlib.sha256(text.replace("\r\n", "\n").encode("utf-8")).hexdigest()
+
+
+def hashed_text(path: str, text: str) -> str:
+    """house.toml as the compiler reads it: no blank or comment lines, and no [jobs], [modules] or [gate] table."""
+    if path != "house.toml":
+        return text
+    skipping = False
+    kept = []
+    for line in text.split("\n"):
+        trimmed = line.strip()
+        if trimmed == "" or trimmed.startswith("#"):
+            continue
+        if trimmed.startswith("["):
+            first = re.split(r"[.\] \t]", re.sub(r"^\[+[ \t]*", "", trimmed), maxsplit=1)[0]
+            first = re.sub(r"^([\"'])(.*)\1$", r"\2", first)
+            skipping = first in ("jobs", "modules", "gate")
+        if not skipping:
+            kept.append(line)
+    return "\n".join(kept) + "\n" if kept else ""
 
 
 def input_paths(root: Path, specs: str) -> list[str]:
@@ -38,7 +58,8 @@ def input_paths(root: Path, specs: str) -> list[str]:
 def input_hash(root: Path, paths: list[str]) -> str:
     digest = hashlib.sha256()
     for path in paths:
-        digest.update(f"{path}\n{content_hash((root / path).read_bytes())}\n".encode())
+        text = (root / path).read_bytes().decode("utf-8").removeprefix("\ufeff").replace("\r\n", "\n")
+        digest.update(f"{path}\n{content_hash(hashed_text(path, text).encode('utf-8'))}\n".encode())
     return digest.hexdigest()
 
 
