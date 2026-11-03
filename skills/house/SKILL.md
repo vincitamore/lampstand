@@ -69,6 +69,9 @@ Run `lampstand <verb> --help` for flags; add `--json` for one machine-readable o
    decides. Whoever is judged by a lens does not shape it.
 6. **Orientation shows only problems.** If it reports STALE, NOT_LANDED, REJECTED, a stale projection or a newer
    schema, deal with that before new work or tell the operator why not.
+7. **Commit as the work lands.** The house is its git history; work left uncommitted is not yet the house's. Commit
+   each finished piece in a small commit that says what changed, naming only the paths you changed. Pushing is the
+   operator's call unless they have said otherwise. A provision in the charter about commits overrides this rule.
 
 ## Before the session ends
 
@@ -76,4 +79,4 @@ The maintenance gate (`lampstand gate <changed paths>`, run by your host for you
 updated or resolved, `state/current.md` brought up to date, a reusable lesson written to `knowledge/`, a decision filed
 in `inbox/decisions/` with its options, a resolution recorded. A proposal owes none of these, and a changed
 constitution file owes only `lampstand compile`. Do each that is owed, or say plainly why it is not owed. In `block`
-mode the session cannot end until the list is empty.
+mode the session cannot end until the list is empty. Then commit what is left of the session's work (rule 7).

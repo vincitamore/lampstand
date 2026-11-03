@@ -16,6 +16,8 @@ Found by running a house day to day with a live model.
 - `run --help` shows how to declare a job.
 - Principles and provisions are adopted by the operator: `adopt` refuses them from an agent's shell, which each host
   adapter marks with `LAMPSTAND_AGENT`. Reflexes stay the agent's to admit.
+- The house skill tells the agent to commit its work as it lands; two houses run with live models left a whole
+  session's work uncommitted without it. A provision about commits overrides the default.
 - Outside a house the plugin is silent. Installed for every session, it used to print a line in each one.
 - `propose --help` shows an example file for each kind, and `propose` checks the file name before anything else.
 - `--body -` reads the body from standard input, so Markdown never passes through shell quoting.
