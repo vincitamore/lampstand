@@ -14,7 +14,7 @@ import { fail } from "../errors.js";
 import { atomicWrite, contentHash, readText } from "../io.js";
 import { HOUSE_SCHEMA_VERSION, loadHouseConfig } from "../config.js";
 import { parseFrontmatter } from "../frontmatter.js";
-import { renderFrontmatter } from "../constitution/curate.js";
+import { readRecord, renderFrontmatter } from "../constitution/curate.js";
 import { runCompile } from "../constitution/run.js";
 import { stateDirFor } from "../state/paths.js";
 import {
@@ -86,23 +86,39 @@ function fenceFor(text) {
 }
 
 /**
- * @param {string} rel  the planted file
- * @param {string} plantedSha  the hash planted.json holds for it
- * @param {string} text  what this lampstand plants there now
+ * An update proposal: the text lampstand plants now, which `lampstand adopt` takes as it is. The frontmatter records
+ * what the proposal was written against, so adopt refuses to overwrite a file that changed since: `target-sha256` is
+ * the target's hash then, `text-sha256` the hash of the text below (checked on adoption), and `upstream-sha256` names
+ * the offer, which a strike records so the same offer is not made again.
+ * @param {{ rel: string, plantedSha: string, text: string, upstream: string, target: string, lattice?: boolean }} offer
+ *   `plantedSha` is the hash planted.json (or, for the lattice, its adopted-hash) held for the file; `target` the
+ *   hash of the file as it is here now; `lattice` marks the pack's lattice, which is never replaced.
  */
-function updateProposal(rel, plantedSha, text) {
+function updateProposal({ rel, plantedSha, text, upstream, target, lattice = false }) {
   const fence = fenceFor(text);
+  const how = `\`lampstand adopt\` takes it as it is (it is listed as \`update/${rel}\`) or strikes it to decline; to take only part of it, edit \`${rel}\` by hand and strike this proposal.`;
+  const why = lattice
+    ? `The lattice here is your own adopted copy of the pack, and upgrade never replaces it. lampstand ${VERSION} ships a different pack, below as the whole file. ${how} Adopting makes your copy this text, dated today; a pack you strike is not offered again until it changes.`
+    : `lampstand ${VERSION} plants a different \`${rel}\` from the one planted here, and the copy here has been edited since, so upgrade left it as it is. The text lampstand plants now is below. ${how}`;
   return [
-    renderFrontmatter({ updates: rel, "planted-sha256": plantedSha, "upstream-sha256": contentHash(text) }).trimEnd(),
+    renderFrontmatter({ updates: rel, "planted-sha256": plantedSha, "upstream-sha256": upstream, "text-sha256": contentHash(text), "target-sha256": target }).trimEnd(),
     `# Update to ${rel}`,
     "",
-    `lampstand ${VERSION} plants a different \`${rel}\` from the one planted here, and the copy here has been edited since, so upgrade left it as it is. The text lampstand plants now is below. Take what you want from it into \`${rel}\`, then delete this file.`,
+    why,
     "",
     fence,
     text.endsWith("\n") ? text.slice(0, -1) : text,
     fence,
     "",
   ].join("\n");
+}
+
+/**
+ * Whether the operator struck this offer of `rel`: the record holds a struck `update/<rel>` for the same offer.
+ * @param {string} root @param {string} rel @param {string} upstream
+ */
+function struckOffer(root, rel, upstream) {
+  return readRecord(root).some((entry) => entry.act === "struck" && entry.kind === "update" && entry.slug === rel && entry.hash === upstream);
 }
 
 /**
@@ -117,7 +133,9 @@ function writeProposal(root, rel, text) {
 }
 
 /**
- * The lattice: compared against the pack through the `adopted-hash` its frontmatter carries.
+ * The lattice: compared against the pack through the `adopted-hash` its frontmatter carries. The copy is the
+ * operator's whether or not it was edited, so the pack is only ever offered: its text when the copy is as adopted, a
+ * note when it has been edited. An offer the operator struck is not made again.
  * @param {string} root
  * @param {string} date
  * @returns {string | null}  the proposal written, or null
@@ -132,14 +150,16 @@ function upgradeLattice(root, date) {
   const packHash = contentHash(readText(LATTICE_PACK));
   if (packHash === adopted) return null;
   const rel = proposalPath(LATTICE_FILE);
+  if (struckOffer(root, LATTICE_FILE, packHash)) return null;
+  const target = contentHash(readText(path));
   if (contentHash(parsed.body) === adopted) {
-    writeProposal(root, rel, updateProposal(LATTICE_FILE, adopted, latticeFile(date).text));
+    writeProposal(root, rel, updateProposal({ rel: LATTICE_FILE, plantedSha: adopted, text: latticeFile(date).text, upstream: packHash, target, lattice: true }));
   } else {
     const note = [
-      renderFrontmatter({ updates: LATTICE_FILE, "adopted-hash": adopted, "upstream-sha256": packHash }).trimEnd(),
+      renderFrontmatter({ updates: LATTICE_FILE, "adopted-hash": adopted, "upstream-sha256": packHash, "target-sha256": target }).trimEnd(),
       "# The lattice pack changed",
       "",
-      `The lattice pack in lampstand ${VERSION} differs from the text \`${LATTICE_FILE}\` was adopted from, and the copy here has been edited since, so no text is proposed. The pack is \`packs/lattice/LATTICE.md\` in the lampstand install; compare it with your copy and take what you want, then delete this file.`,
+      `The lattice pack in lampstand ${VERSION} differs from the text \`${LATTICE_FILE}\` was adopted from, and your copy has been edited since, so no text is proposed. The pack is \`packs/lattice/LATTICE.md\` in the lampstand install; compare it with your copy and take what you want, then strike this proposal with \`lampstand adopt\` (a pack you strike is not offered again until it changes).`,
       "",
     ].join("\n");
     writeProposal(root, rel, note);
@@ -219,9 +239,11 @@ export function upgradeHouse({ root, env, now, date }) {
       // The edited file stays as it is. Recording the offered text as planted means this change is proposed once,
       // and a copy the operator brings to exactly this text counts as unedited at the next change.
       const rel = proposalPath(file.rel);
-      writeProposal(root, rel, updateProposal(file.rel, record.sha256, file.text));
+      if (!struckOffer(root, file.rel, contentHash(file.text))) {
+        writeProposal(root, rel, updateProposal({ rel: file.rel, plantedSha: record.sha256, text: file.text, upstream: contentHash(file.text), target: here }));
+        out.proposed.push(rel);
+      }
       record.sha256 = upstream;
-      out.proposed.push(rel);
     }
   }
   const lattice = upgradeLattice(root, date);

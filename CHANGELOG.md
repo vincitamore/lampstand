@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.1
+
+An update that `lampstand upgrade` cannot apply for you now has a way to be taken or declined.
+
+- `lampstand adopt` lists each update proposal (`proposals/updates/**`, written by `upgrade` when a planted file or the
+  lattice pack changed and your copy must not be replaced) as `update/<path>`, for example `update/principles/lattice.md`,
+  with its text verbatim and its size. Adopting writes the proposed text over the file (a principle file keeps its
+  `origin` and is dated today, as principle adoption does), deletes the proposal, records the act in `charter/record.md`,
+  recompiles and commits. Striking declines it and records the strike, so `upgrade` does not offer the same text again.
+  `--ids update/<path>` does it without asking. An update replaces a planted file, so it is the operator's: an agent's
+  shell is refused with `E_OPERATOR_ONLY`. If the file changed after the proposal was written, adopt refuses to overwrite
+  it; a proposal written by 0.2.0 records no such hash and can be adopted only for the lattice while its copy is as adopted.
+- The lattice proposal says what is true: the house's lattice is the operator's adopted copy and is never replaced, and
+  upgrade lists it apart from the edited files it left alone.
+- Houses upgraded under 0.2.0 hold an older proposal: run `lampstand upgrade` again to get the lattice's in the new form,
+  then `lampstand adopt`.
+
 ## 0.2.0
 
 Found by running houses day to day with live models. After upgrading the plugin and the CLI, run `lampstand upgrade`

@@ -54,10 +54,11 @@ function full(root, rel) {
 }
 
 /**
- * @typedef {{ date: string, act: "adopted" | "struck", kind: Kind, slug: string, hash: string }} RecordEntry
+ * @typedef {{ date: string, act: "adopted" | "struck", kind: Kind | "update", slug: string, hash: string }} RecordEntry
+ *   An update proposal (the new text of a planted file) is recorded as kind `update` with the target's path as slug.
  */
 
-const RECORD_LINE = /^- ([0-9]{4}-[0-9]{2}-[0-9]{2}) (adopted|struck) (principle|provision|reflex)\/([a-z0-9][a-z0-9-]*) sha256:([0-9a-f]{64})(?: |$)/;
+const RECORD_LINE = /^- ([0-9]{4}-[0-9]{2}-[0-9]{2}) (adopted|struck) (principle|provision|reflex|update)\/([A-Za-z0-9][A-Za-z0-9._\/-]*) sha256:([0-9a-f]{64})(?: |$)/;
 
 /** @param {string} root @returns {RecordEntry[]} */
 export function readRecord(root) {
@@ -67,14 +68,14 @@ export function readRecord(root) {
     .split("\n")
     .map((line) => RECORD_LINE.exec(line))
     .filter((match) => match !== null)
-    .map((m) => ({ date: m[1], act: /** @type {"adopted" | "struck"} */ (m[2]), kind: /** @type {Kind} */ (m[3]), slug: m[4], hash: m[5] }));
+    .map((m) => ({ date: m[1], act: /** @type {"adopted" | "struck"} */ (m[2]), kind: /** @type {Kind | "update"} */ (m[3]), slug: m[4], hash: m[5] }));
 }
 
 /**
  * @param {string} root
  * @param {RecordEntry & { occasion?: string | null }} entry
  */
-function appendRecord(root, entry) {
+export function appendRecord(root, entry) {
   const path = full(root, RECORD_PATH);
   const before = existsSync(path) ? readText(path) : readFileSync(RECORD_TEMPLATE, "utf8");
   const occasion = entry.occasion ? ` occasion: ${entry.occasion.replace(/\s+/g, " ")}` : "";
@@ -85,10 +86,33 @@ function appendRecord(root, entry) {
 
 /**
  * @typedef {{
- *   id: string, kind: Kind, slug: string, path: string, text: string, body: string, hash: string,
+ *   id: string, kind: Kind | "update", slug: string, path: string, text: string, body: string, hash: string,
  *   occasion: string | null, chars: number, surface: string, surfaceChars: number, cap: number,
+ *   update?: UpdateOffer,
  * }} ProposedItem
+ *   `surface` is empty for an item with no budget to measure it against. An item of kind `update` is an offered new
+ *   text for a planted file (see updates.js); `hash` is then the offer's `upstream-sha256`.
+ * @typedef {{
+ *   target: string, upstream: string | null, textSha: string | null, targetSha: string | null, planted: string | null,
+ * }} UpdateOffer
  */
+
+/**
+ * How full each budget surface is now. A surface measured once per host is reported as its largest instance against
+ * the tightest of their caps.
+ * @param {import("./house.js").House} house
+ */
+export function surfaceMeter(house) {
+  const { manifest } = compileHouse(house);
+  /** @param {string} surface */
+  const instances = (surface) => Object.entries(manifest.surfaces).filter(([key]) => surfaceOf(key) === surface).map(([, size]) => size);
+  return {
+    /** @param {string} surface */
+    current: (surface) => Math.max(0, ...instances(surface).map((size) => size.chars)),
+    /** @param {string} surface */
+    capFor: (surface) => Math.min(...instances(surface).map((size) => size.cap)),
+  };
+}
 
 /**
  * Every proposal in the house, in kind order then code point order of slug, each with its size against the budget
@@ -98,14 +122,7 @@ function appendRecord(root, entry) {
  */
 export function listProposals(root) {
   const house = loadHouse(root);
-  const { manifest } = compileHouse(house);
-  // A surface measured once per host is reported as its largest instance against the tightest of their caps.
-  /** @param {string} surface */
-  const instances = (surface) => Object.entries(manifest.surfaces).filter(([key]) => surfaceOf(key) === surface).map(([, size]) => size);
-  /** @param {string} surface */
-  const current = (surface) => Math.max(0, ...instances(surface).map((size) => size.chars));
-  /** @param {string} surface */
-  const capFor = (surface) => Math.min(...instances(surface).map((size) => size.cap));
+  const { current, capFor } = surfaceMeter(house);
   return house.proposals.map((proposal) => {
     const text = readText(full(root, proposal.path));
     const surface = KIND_SURFACE[proposal.kind];
@@ -129,7 +146,7 @@ export function listProposals(root) {
 
 /** One line for an item's size against its budget. @param {ProposedItem} item */
 export function sizeLine(item) {
-  return `${item.id}: ${item.chars} chars; ${item.surface} is ${item.surfaceChars} of ${item.cap}`;
+  return item.surface === "" ? `${item.id}: ${item.chars} chars` : `${item.id}: ${item.chars} chars; ${item.surface} is ${item.surfaceChars} of ${item.cap}`;
 }
 
 /**
@@ -141,22 +158,23 @@ export function sizeLine(item) {
  * @returns {string | null}  refusal reason, or null when adopted
  */
 export function adoptItem(root, item, date) {
-  const destRel = `${KIND_DIRS[item.kind].adopted}/${item.slug}.md`;
+  const kind = /** @type {Kind} */ (item.kind);
+  const destRel = `${KIND_DIRS[kind].adopted}/${item.slug}.md`;
   const dest = full(root, destRel);
   if (existsSync(dest)) return `${destRel} already exists`;
   const source = full(root, item.path);
   const parsed = parseFrontmatter(readText(source), source);
   /** @type {Frontmatter} */
   const frontmatter = {};
-  if (item.kind === "principle") frontmatter.origin = "own";
+  if (kind === "principle") frontmatter.origin = "own";
   Object.assign(frontmatter, parsed.frontmatter ?? {});
   frontmatter.adopted = date;
   frontmatter["adopted-hash"] = contentHash(parsed.body);
   const text = `${renderFrontmatter(frontmatter)}${parsed.body}`;
-  parseKind(item.kind, text, dest, "adopted");
+  parseKind(kind, text, dest, "adopted");
   mkdirSync(dirname(dest), { recursive: true });
   atomicWrite(dest, text);
-  appendRecord(root, { date, act: "adopted", kind: item.kind, slug: item.slug, hash: item.hash, occasion: item.occasion });
+  appendRecord(root, { date, act: "adopted", kind, slug: item.slug, hash: item.hash, occasion: item.occasion });
   rmSync(source, { force: true });
   return null;
 }
@@ -169,7 +187,7 @@ export function adoptItem(root, item, date) {
  * @returns {string[]}
  */
 export function actPaths(item, act) {
-  return act === "adopted" ? [RECORD_PATH, item.path, `${KIND_DIRS[item.kind].adopted}/${item.slug}.md`] : [RECORD_PATH, item.path];
+  return act === "adopted" ? [RECORD_PATH, item.path, `${KIND_DIRS[/** @type {Kind} */ (item.kind)].adopted}/${item.slug}.md`] : [RECORD_PATH, item.path];
 }
 
 /**

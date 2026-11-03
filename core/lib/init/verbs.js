@@ -8,9 +8,9 @@ import { today } from "../constitution/curate.js";
 import { answersFrom, askAnswers, kernelFit, kernelFitText, readAnswersFile } from "./answers.js";
 import { commitLine } from "../commit.js";
 import { initHouse, PLANT_MESSAGE } from "./init.js";
-import { PACKAGE_ROOT } from "./plant.js";
+import { LATTICE_FILE, PACKAGE_ROOT } from "./plant.js";
 import { regionProblem } from "./region.js";
-import { upgradeHouse, upgradeMessage } from "./upgrade.js";
+import { proposalPath, upgradeHouse, upgradeMessage } from "./upgrade.js";
 
 /** @typedef {import("../cli.js").Verb} Verb */
 /** @typedef {import("../constitution/rules.js").Finding} Finding */
@@ -208,13 +208,17 @@ export const upgradeVerb = {
     if (found.root === null) throw fail("E_NO_HOUSE", `no house resolved from ${resolve(context.cwd)}`);
     const result = upgradeHouse({ root: found.root, env: context.env, now: new Date(), date: today() });
     const compile = compileLines(result);
+    const latticeProposal = proposalPath(LATTICE_FILE);
+    const lattice = result.proposed.filter((rel) => rel === latticeProposal);
+    const edited = result.proposed.filter((rel) => rel !== latticeProposal);
     const lines = [
       `upgraded the house at ${result.root}`,
       `backup: ${result.backup}`,
       result.migrations.length === 0 ? "migrations: none needed" : `migrations: ${result.migrations.map((m) => `${m.from} to ${m.to} (${m.summary})`).join("; ")}`,
       ...listing("updated (unedited, replaced)", result.updated),
       ...listing("planted (new in this lampstand)", result.planted),
-      ...listing("proposed (edited here, left as they are)", result.proposed),
+      ...listing("proposed (edited here, left as they are; lampstand adopt takes or strikes each)", edited),
+      ...listing("proposed (the lattice is your adopted copy and is never replaced; lampstand adopt takes the new pack text or strikes it)", lattice),
       ...compile.lines,
       commitLine(result.commit, upgradeMessage()),
     ];

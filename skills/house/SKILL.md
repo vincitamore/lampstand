@@ -51,7 +51,9 @@ Run `lampstand <verb> --help` for flags; add `--json` for one machine-readable o
   operator turns it on with `[modules] scheduler = true`, and `scheduler enable|disable` are refused from your shell
   with `E_OPERATOR_ONLY`: the operator runs them in a terminal). A job is a `[jobs.<id>]` table in house.toml with `argv` and
   `stale_hours` required, and `every`, `at`, `outputs`, `mutates`, `commit` optional; `run --help` shows an example.
-- **The house itself:** `init`, `upgrade`, `doctor`, `seat status|reset`, `root`, `gate`.
+- **The house itself:** `init`, `upgrade`, `doctor`, `seat status|reset`, `root`, `gate`. `upgrade` leaves an edited
+  planted file, and the lattice, as an update proposal in `proposals/updates/`; the operator takes or strikes it with
+  `adopt` (`update/<path>`), which an agent's shell is refused.
 
 ## Rules that hold every session
 

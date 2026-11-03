@@ -55,6 +55,11 @@ without a host limit on OMP.
   time, shown verbatim with their size. The agent never adopts on your behalf. Each run commits exactly the files it
   changed (the record, the moved proposal, the projections) as `Adopt <kind>/<slug>` or `Strike <kind>/<slug>`. The CLI refuses principles and provisions from an agent's shell (the OMP and Hermes
   plugins mark it with `LAMPSTAND_AGENT`); you adopt them in your own terminal or with `/lampstand adopt`.
+- **Upgrade:** `lampstand upgrade` brings a house up to the installed lampstand. A planted file you never edited is
+  replaced. One you edited, and the lattice (your adopted copy, never replaced), keep every byte and get an update
+  proposal in `proposals/updates/` instead. `lampstand adopt` lists each as `update/<path>`: adopt it to take the new
+  text whole, or strike it to decline (a declined text is not offered again until it changes). To take only part,
+  edit the file by hand and strike the proposal. Only you adopt updates; an agent's shell is refused.
 - **Propose:** when something happens that calls for a new principle, rule or habit, the agent files it with
   `lampstand propose` and the occasion that called for it. `lampstand propose <kind> --help` shows the file to write.
 
