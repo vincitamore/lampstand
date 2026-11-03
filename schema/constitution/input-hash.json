@@ -1,0 +1,67 @@
+{
+  "description": "The input hash in every projection header. The header names the inputs as house.toml, principles/*.md, charter/core.md, charter/provisions/*.md, reflexes/*.md, voice.md. A spec ending in /*.md is every regular *.md file directly in that directory, in code point order of its name; other specs are single files. Absent files are skipped. The hash is sha256 over the UTF-8 of, for each present file in spec order, <house-relative path with / separators>\\n<content-hash>\\n, where content-hash is sha256 hex of the file's text after dropping a leading BOM and turning CRLF into LF (schema/conformance/hash). Each vector plants files (house-relative path to text) in an empty directory; input-paths and input-hash are what a reader must compute.",
+  "vectors": [
+    {
+      "name": "house.toml alone",
+      "files": {
+        "house.toml": "[house]\nschema = 1\nid = \"0b9a1c2e-4f5d-4e6a-8b7c-9d0e1f2a3b4c\"\nname = \"v\"\n"
+      },
+      "input-paths": ["house.toml"],
+      "input-hash": "6a59c162f8c196db092b8ac1188a980d69ace6ea282bce94f7040c7778ca363f"
+    },
+    {
+      "name": "every spec present, in spec order rather than path order",
+      "files": {
+        "house.toml": "[house]\nschema = 1\nid = \"0b9a1c2e-4f5d-4e6a-8b7c-9d0e1f2a3b4c\"\nname = \"v\"\n",
+        "voice.md": "# Voice\n",
+        "reflexes/INDEX.md": "# Reflexes\n",
+        "reflexes/a.md": "---\nscope: \"behavioral\"\n---\nA\n",
+        "charter/provisions/p.md": "# P\n",
+        "charter/core.md": "# Charter\n",
+        "principles/lattice.md": "### X : Y\n"
+      },
+      "input-paths": [
+        "house.toml",
+        "principles/lattice.md",
+        "charter/core.md",
+        "charter/provisions/p.md",
+        "reflexes/INDEX.md",
+        "reflexes/a.md",
+        "voice.md"
+      ],
+      "input-hash": "053a9b4ec45329ceee1426932053da7e147c3bae8d114d54d759b95d32329b7c"
+    },
+    {
+      "name": "CRLF line endings and a BOM hash as their LF, BOM-free text",
+      "files": {
+        "house.toml": "[house]\r\nschema = 1\r\nid = \"0b9a1c2e-4f5d-4e6a-8b7c-9d0e1f2a3b4c\"\r\nname = \"v\"\r\n",
+        "voice.md": "\ufeff# Voice\r\n"
+      },
+      "input-paths": ["house.toml", "voice.md"],
+      "input-hash": "a76ee5a673b5493ef21f0b1da6acb65df01828cb76083caad8371871e4e686d8"
+    },
+    {
+      "name": "the LF, BOM-free twin of the previous vector",
+      "files": {
+        "house.toml": "[house]\nschema = 1\nid = \"0b9a1c2e-4f5d-4e6a-8b7c-9d0e1f2a3b4c\"\nname = \"v\"\n",
+        "voice.md": "# Voice\n"
+      },
+      "input-paths": ["house.toml", "voice.md"],
+      "input-hash": "a76ee5a673b5493ef21f0b1da6acb65df01828cb76083caad8371871e4e686d8"
+    },
+    {
+      "name": "directory files are ordered by code point, not UTF-16 unit; non-.md files and subdirectories are not inputs",
+      "files": {
+        "house.toml": "[house]\nschema = 1\nid = \"0b9a1c2e-4f5d-4e6a-8b7c-9d0e1f2a3b4c\"\nname = \"v\"\n",
+        "principles/\uff01.md": "fullwidth\n",
+        "principles/\ud83d\ude00.md": "astral\n",
+        "principles/B.md": "upper\n",
+        "principles/a.md": "lower\n",
+        "principles/notes.txt": "not an input\n",
+        "principles/nested/c.md": "not an input\n"
+      },
+      "input-paths": ["house.toml", "principles/B.md", "principles/a.md", "principles/\uff01.md", "principles/\ud83d\ude00.md"],
+      "input-hash": "8ec421718aa637060ef5dd72d6ff55758f3c18d557c01cd4aee83c0293cbe8c2"
+    }
+  ]
+}

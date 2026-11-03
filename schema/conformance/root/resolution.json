@@ -1,0 +1,212 @@
+{
+  "about": [
+    "House resolution vectors. A runner makes a fresh empty temporary directory T (taken through realpath) with no house.toml in any ancestor, then:",
+    "- creates every entry of `dirs` (relative paths with / separators) as a directory and every key of `files` as a file with that content, creating parents;",
+    "- writes `config`, when present, to T/config/lampstand/config.toml;",
+    "- resolves with exactly the environment `env` plus LAMPSTAND_CONFIG_ROOT=T/config, nothing inherited, the working directory T/`cwd`, and the workspace flag `workspace`.",
+    "Every occurrence of {T} in `env` values and in `config` is replaced by T before use.",
+    "`expect` is either {rule, root}, where root is relative to T (\"\" is T itself) or null for dormant, or {error: code}."
+  ],
+  "vectors": [
+    {
+      "description": "walk-up finds house.toml in the working directory itself",
+      "files": { "house/house.toml": "" },
+      "cwd": "house",
+      "workspace": true,
+      "env": {},
+      "expect": { "rule": "walk-up", "root": "house" }
+    },
+    {
+      "description": "walk-up climbs from a deep subdirectory",
+      "files": { "house/house.toml": "" },
+      "dirs": ["house/tasks/a/b/c"],
+      "cwd": "house/tasks/a/b/c",
+      "workspace": true,
+      "env": {},
+      "expect": { "rule": "walk-up", "root": "house" }
+    },
+    {
+      "description": "walk-up passes through a nested independent git repository",
+      "files": { "house/house.toml": "", "house/.git/HEAD": "ref: refs/heads/main\n", "house/forge/app/.git/HEAD": "ref: refs/heads/main\n" },
+      "dirs": ["house/forge/app/src"],
+      "cwd": "house/forge/app/src",
+      "workspace": true,
+      "env": {},
+      "expect": { "rule": "walk-up", "root": "house" }
+    },
+    {
+      "description": "walk-up passes through a git root that is a .git file (worktree or submodule)",
+      "files": { "house/house.toml": "", "house/forge/sub/.git": "gitdir: ../../.git/modules/sub\n" },
+      "cwd": "house/forge/sub",
+      "workspace": true,
+      "env": {},
+      "expect": { "rule": "walk-up", "root": "house" }
+    },
+    {
+      "description": "the nearest house.toml wins",
+      "files": { "outer/house.toml": "", "outer/inner/house.toml": "" },
+      "dirs": ["outer/inner/notes"],
+      "cwd": "outer/inner/notes",
+      "workspace": true,
+      "env": {},
+      "expect": { "rule": "walk-up", "root": "outer/inner" }
+    },
+    {
+      "description": "a directory named house.toml is not a marker",
+      "dirs": ["fake/house.toml", "fake/work"],
+      "cwd": "fake/work",
+      "workspace": true,
+      "env": {},
+      "expect": { "rule": "dormant", "root": null }
+    },
+    {
+      "description": "no house anywhere: dormant, not an error",
+      "dirs": ["plain/dir"],
+      "cwd": "plain/dir",
+      "workspace": true,
+      "env": {},
+      "expect": { "rule": "dormant", "root": null }
+    },
+    {
+      "description": "HOUSE_ROOT wins over a house found by walking up",
+      "files": { "a/house.toml": "", "b/house.toml": "" },
+      "cwd": "a",
+      "workspace": true,
+      "env": { "HOUSE_ROOT": "{T}/b" },
+      "expect": { "rule": "HOUSE_ROOT", "root": "b" }
+    },
+    {
+      "description": "HOUSE_ROOT without house.toml is an error even inside another house",
+      "files": { "a/house.toml": "" },
+      "dirs": ["empty"],
+      "cwd": "a",
+      "workspace": true,
+      "env": { "HOUSE_ROOT": "{T}/empty" },
+      "expect": { "error": "E_HOUSE_ROOT_INVALID" }
+    },
+    {
+      "description": "HOUSE_ROOT naming a missing directory is an error",
+      "dirs": ["work"],
+      "cwd": "work",
+      "workspace": true,
+      "env": { "HOUSE_ROOT": "{T}/missing" },
+      "expect": { "error": "E_HOUSE_ROOT_INVALID" }
+    },
+    {
+      "description": "HOUSE_ROOT naming a file is an error",
+      "files": { "file.txt": "x" },
+      "cwd": "",
+      "workspace": true,
+      "env": { "HOUSE_ROOT": "{T}/file.txt" },
+      "expect": { "error": "E_HOUSE_ROOT_INVALID" }
+    },
+    {
+      "description": "HOUSE_ROOT invalid is an error even when default_house would be valid",
+      "files": { "home/house.toml": "" },
+      "dirs": ["empty", "work"],
+      "config": "default_house = '{T}/home'\n",
+      "cwd": "work",
+      "workspace": false,
+      "env": { "HOUSE_ROOT": "{T}/empty" },
+      "expect": { "error": "E_HOUSE_ROOT_INVALID" }
+    },
+    {
+      "description": "a relative HOUSE_ROOT resolves against the working directory",
+      "files": { "work/house/house.toml": "" },
+      "cwd": "work",
+      "workspace": true,
+      "env": { "HOUSE_ROOT": "house" },
+      "expect": { "rule": "HOUSE_ROOT", "root": "work/house" }
+    },
+    {
+      "description": "an empty HOUSE_ROOT counts as unset",
+      "files": { "house/house.toml": "" },
+      "cwd": "house",
+      "workspace": true,
+      "env": { "HOUSE_ROOT": "" },
+      "expect": { "rule": "walk-up", "root": "house" }
+    },
+    {
+      "description": "default_house is used on a surface with no workspace",
+      "files": { "home/house.toml": "" },
+      "dirs": ["elsewhere"],
+      "config": "default_house = '{T}/home'\n",
+      "cwd": "elsewhere",
+      "workspace": false,
+      "env": {},
+      "expect": { "rule": "default_house", "root": "home" }
+    },
+    {
+      "description": "default_house is never used on a surface with a workspace",
+      "files": { "home/house.toml": "" },
+      "dirs": ["elsewhere"],
+      "config": "default_house = '{T}/home'\n",
+      "cwd": "elsewhere",
+      "workspace": true,
+      "env": {},
+      "expect": { "rule": "dormant", "root": null }
+    },
+    {
+      "description": "walk-up wins over default_house",
+      "files": { "home/house.toml": "", "here/house.toml": "" },
+      "config": "default_house = '{T}/home'\n",
+      "cwd": "here",
+      "workspace": false,
+      "env": {},
+      "expect": { "rule": "walk-up", "root": "here" }
+    },
+    {
+      "description": "no workspace and no config file: dormant",
+      "dirs": ["elsewhere"],
+      "cwd": "elsewhere",
+      "workspace": false,
+      "env": {},
+      "expect": { "rule": "dormant", "root": null }
+    },
+    {
+      "description": "no workspace and a config without default_house: dormant",
+      "dirs": ["elsewhere"],
+      "config": "[houses.\"0b9a1c2e-4f5d-4e6a-8b7c-9d0e1f2a3b4c\"]\nstate_dir = '{T}/state'\n",
+      "cwd": "elsewhere",
+      "workspace": false,
+      "env": {},
+      "expect": { "rule": "dormant", "root": null }
+    },
+    {
+      "description": "default_house without house.toml is an error",
+      "dirs": ["home", "elsewhere"],
+      "config": "default_house = '{T}/home'\n",
+      "cwd": "elsewhere",
+      "workspace": false,
+      "env": {},
+      "expect": { "error": "E_DEFAULT_HOUSE_INVALID" }
+    },
+    {
+      "description": "a relative default_house is an error",
+      "files": { "elsewhere/home/house.toml": "" },
+      "config": "default_house = 'home'\n",
+      "cwd": "elsewhere",
+      "workspace": false,
+      "env": {},
+      "expect": { "error": "E_DEFAULT_HOUSE_INVALID" }
+    },
+    {
+      "description": "a malformed per-user config is an error when it is consulted",
+      "dirs": ["elsewhere"],
+      "config": "default_house = \n",
+      "cwd": "elsewhere",
+      "workspace": false,
+      "env": {},
+      "expect": { "error": "E_PARSE_TOML" }
+    },
+    {
+      "description": "per-user config is not read on a surface with a workspace",
+      "dirs": ["elsewhere"],
+      "config": "default_house = \n",
+      "cwd": "elsewhere",
+      "workspace": true,
+      "env": {},
+      "expect": { "rule": "dormant", "root": null }
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "transport": "local",
+  "path": "~/.agora/desk.ndjson",
+  "note": "the sessions on this machine: who is doing what, and what is done"
+}

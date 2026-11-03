@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "house.toml [jobs]",
+  "description": "One table per job, [jobs.<id>], with <id> matching ^[a-z][a-z0-9-]*$. At most one of every, at and cron; a job with none runs only by hand. outputs are path prefixes the job may create files under; mutates are existing files it may replace. Paths are relative to the house, written with forward slashes, and never enter .git. Constraints the schema subset cannot state (argv not empty, a valid cron string, one schedule key) are checked by core/lib/governance/jobs.js.",
+  "type": "object",
+  "additionalProperties": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["argv", "stale_hours"],
+    "properties": {
+      "argv": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+      "every": { "type": "string", "pattern": "^[1-9][0-9]*[mhd]$" },
+      "at": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$" },
+      "cron": { "type": "string", "minLength": 9 },
+      "stale_hours": { "type": "number", "minimum": 0 },
+      "outputs": {
+        "type": "array",
+        "items": { "type": "string", "pattern": "^[^/\\\\:\\u0000]+(/[^/\\\\:\\u0000]+)*/?$" }
+      },
+      "mutates": {
+        "type": "array",
+        "items": { "type": "string", "pattern": "^[^/\\\\:\\u0000]+(/[^/\\\\:\\u0000]+)*$" }
+      },
+      "commit": { "enum": [false, true, "push"] },
+      "cost_ceiling_usd": { "type": "number", "minimum": 0 },
+      "env": { "type": "array", "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" } }
+    }
+  }
+}

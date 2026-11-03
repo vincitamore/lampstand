@@ -1,0 +1,7 @@
+{
+  "description": "What lampstand rooms enable seeds into a house's rooms/ folder, and what lampstand init and upgrade plant there once [modules] rooms is true. Each entry copies template to destination only when the destination is missing. An entry carrying room is an example room row: the alias it is shown under, never written into agora's config by lampstand. The rooms provision is not planted here: enable files it as a proposal from provision/room-messages.md, for the operator to adopt.",
+  "files": [
+    { "template": "README.md", "destination": "rooms/README.md", "when": { "modules.rooms": true } },
+    { "template": "example-room.json", "destination": "rooms/example-room.json", "when": { "modules.rooms": true }, "room": "desk" }
+  ]
+}

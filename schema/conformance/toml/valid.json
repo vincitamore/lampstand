@@ -1,0 +1,119 @@
+{
+  "about": "TOML inside lampstand's subset. Parsing `input` yields `expected`. Integers and floats are JSON numbers; a float with no fraction (1.0) is the same JSON number as the integer 1.",
+  "vectors": [
+    { "description": "empty document", "input": "", "expected": {} },
+    {
+      "description": "comments and blank lines only",
+      "input": "# a comment\n\n   # indented comment\n",
+      "expected": {}
+    },
+    {
+      "description": "the design's house.toml",
+      "input": "[house]\nschema = 1\nid = \"0b9a1c2e-4f5d-4e6a-8b7c-9d0e1f2a3b4c\"\nname = \"my-house\"\n\n[operator]\nname = \"ana\"\nco_owners = []\n\n[purpose]\ntext = \"who the work is for\"\n\n[charter]\nmode = \"rules\"            # none | rules | agreement\n\n[budget]\nprofile = \"standard\"\n\n[modules]\nscheduler = false\nrooms = false\nresidents = false\nwatchdog = false\norchestration = true\n\n[gate]\nmode = \"remind\"\n\n[plugin]\nmin = \"0.1.0\"\n\n[packs]\nprinciples = \"1\"\n",
+      "expected": {
+        "house": { "schema": 1, "id": "0b9a1c2e-4f5d-4e6a-8b7c-9d0e1f2a3b4c", "name": "my-house" },
+        "operator": { "name": "ana", "co_owners": [] },
+        "purpose": { "text": "who the work is for" },
+        "charter": { "mode": "rules" },
+        "budget": { "profile": "standard" },
+        "modules": { "scheduler": false, "rooms": false, "residents": false, "watchdog": false, "orchestration": true },
+        "gate": { "mode": "remind" },
+        "plugin": { "min": "0.1.0" },
+        "packs": { "principles": "1" }
+      }
+    },
+    {
+      "description": "bare, quoted and dotted keys",
+      "input": "bare_key-1 = 1\n\"quoted key\" = 2\n'literal key' = 3\nsite.\"example.com\".up = true\n a . b = 4\n1234 = \"numeric bare key\"\n\"\" = \"empty quoted key\"\n",
+      "expected": {
+        "bare_key-1": 1,
+        "quoted key": 2,
+        "literal key": 3,
+        "site": { "example.com": { "up": true } },
+        "a": { "b": 4 },
+        "1234": "numeric bare key",
+        "": "empty quoted key"
+      }
+    },
+    {
+      "description": "dotted keys extend a table they created",
+      "input": "fruit.name = \"apple\"\nfruit.color = \"red\"\nfruit.taste.sweet = true\n",
+      "expected": { "fruit": { "name": "apple", "color": "red", "taste": { "sweet": true } } }
+    },
+    {
+      "description": "basic string escapes",
+      "input": "s = \"tab\\tnl\\nquote\\\"back\\\\slash\\b\\f\\r é\\u00e9 \\U0001F600\"\n",
+      "expected": { "s": "tab\tnl\nquote\"back\\slash\b\f\r éé \ud83d\ude00" }
+    },
+    {
+      "description": "literal strings take backslashes verbatim",
+      "input": "path = 'C:\\Users\\<name>\\new'\nre = '<\\i\\c*\\s*>'\nquoted = 'Tom \"Dubs\" Preston'\n",
+      "expected": { "path": "C:\\Users\\<name>\\new", "re": "<\\i\\c*\\s*>", "quoted": "Tom \"Dubs\" Preston" }
+    },
+    {
+      "description": "a tab inside a string is allowed",
+      "input": "s = \"a\tb\"\n",
+      "expected": { "s": "a\tb" }
+    },
+    {
+      "description": "integers",
+      "input": "a = 0\nb = +99\nc = -17\nd = 1_000\ne = 5_349_221\nf = 9007199254740991\ng = -9007199254740991\nh = +0\ni = -0\n",
+      "expected": { "a": 0, "b": 99, "c": -17, "d": 1000, "e": 5349221, "f": 9007199254740991, "g": -9007199254740991, "h": 0, "i": 0 }
+    },
+    {
+      "description": "floats",
+      "input": "a = 3.1415\nb = -0.01\nc = 5e+22\nd = 1e06\ne = -2E-2\nf = 6.626e-34\ng = 224_617.445_991_228\nh = +1.5\ni = 1.0\n",
+      "expected": { "a": 3.1415, "b": -0.01, "c": 5e22, "d": 1000000, "e": -0.02, "f": 6.626e-34, "g": 224617.445991228, "h": 1.5, "i": 1 }
+    },
+    {
+      "description": "booleans",
+      "input": "t = true\nf = false\n",
+      "expected": { "t": true, "f": false }
+    },
+    {
+      "description": "arrays: empty, nested, mixed, multi-line with comments and a trailing comma",
+      "input": "e = []\nn = [ [1, 2], [\"a\", 'b'] ]\nm = [1, \"two\", 3.0, true]\nml = [\n  \"x\", # first\n  # a comment line\n  \"y\",\n]\n",
+      "expected": { "e": [], "n": [[1, 2], ["a", "b"]], "m": [1, "two", 3, true], "ml": ["x", "y"] }
+    },
+    {
+      "description": "inline tables, nested and with dotted keys",
+      "input": "point = { x = 1, y = 2 }\nempty = {}\nnested = { a = { b = \"c\" }, list = [ { k = 1 } ] }\ndotted = { type.name = \"pug\", type.size = 3 }\n",
+      "expected": {
+        "point": { "x": 1, "y": 2 },
+        "empty": {},
+        "nested": { "a": { "b": "c" }, "list": [{ "k": 1 }] },
+        "dotted": { "type": { "name": "pug", "size": 3 } }
+      }
+    },
+    {
+      "description": "a super-table may be defined after its sub-table",
+      "input": "[x.y.z]\nw = 1\n[x]\nv = 2\n",
+      "expected": { "x": { "y": { "z": { "w": 1 } }, "v": 2 } }
+    },
+    {
+      "description": "a header may add a sub-table under a table made by dotted keys",
+      "input": "[fruit]\napple.color = \"red\"\napple.taste.sweet = true\n\n[fruit.apple.texture]\nsmooth = true\n",
+      "expected": { "fruit": { "apple": { "color": "red", "taste": { "sweet": true }, "texture": { "smooth": true } } } }
+    },
+    {
+      "description": "whitespace inside headers and around equals signs",
+      "input": "[ a . \"b c\" ]\n  k\t=\t\"v\"  # trailing comment\n",
+      "expected": { "a": { "b c": { "k": "v" } } }
+    },
+    {
+      "description": "a leading BOM and CRLF line endings",
+      "input": "\ufeff[t]\r\nk = \"v\"\r\nn = 1\r\n",
+      "expected": { "t": { "k": "v", "n": 1 } }
+    },
+    {
+      "description": "no final newline",
+      "input": "k = \"v\"",
+      "expected": { "k": "v" }
+    },
+    {
+      "description": "a key named __proto__ is an ordinary key",
+      "input": "__proto__ = 1\n[constructor]\nx = 2\n",
+      "expected": { "__proto__": 1, "constructor": { "x": 2 } }
+    }
+  ]
+}

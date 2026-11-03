@@ -1,0 +1,21 @@
+{
+  "about": "contentHash(input) = sha256 hex over the UTF-8 bytes of input after removing one leading U+FEFF and replacing every CR LF pair with LF. A lone CR is kept. Expected digests were computed from the normalized bytes independently of the implementation.",
+  "vectors": [
+    { "description": "empty text", "input": "", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" },
+    { "description": "LF text", "input": "hello\n", "sha256": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03" },
+    { "description": "CRLF text hashes like its LF form", "input": "hello\r\n", "sha256": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03" },
+    { "description": "a leading BOM is ignored", "input": "\ufeffhello\n", "sha256": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03" },
+    { "description": "BOM and CRLF together", "input": "\ufeffhello\r\n", "sha256": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03" },
+    { "description": "multi-line LF without a final newline", "input": "a\nb\nc", "sha256": "ea7fb08b7a2dc4619ffb7c7bb38d95a2047935fa165d71b12efd3852a2e6d0cc" },
+    { "description": "multi-line CRLF without a final newline", "input": "a\r\nb\r\nc", "sha256": "ea7fb08b7a2dc4619ffb7c7bb38d95a2047935fa165d71b12efd3852a2e6d0cc" },
+    { "description": "mixed CRLF and LF", "input": "a\r\nb\nc", "sha256": "ea7fb08b7a2dc4619ffb7c7bb38d95a2047935fa165d71b12efd3852a2e6d0cc" },
+    { "description": "a lone CR is content, not a line ending", "input": "a\rb", "sha256": "af9081672dd5ef3247a30c2db5b0dafcc9bcf981a26aefb3c55d210d43fcc14e" },
+    { "description": "the LF form differs from the lone-CR form", "input": "a\nb", "sha256": "7e18f737311b2dc3b2f269dd78396b0351f14fb66efa879f768cb23181883c78" },
+    { "description": "CR CR LF keeps the first CR", "input": "\r\r\n", "sha256": "7eb70257593da06f682a3ddda54a9d260d4fc514f645237f5ca74b08f8da61a6" },
+    { "description": "non-ASCII text is hashed as UTF-8", "input": "café \u2615\n", "sha256": "499beb0d4220bfd94ea8547bcf09324aecf1c7d3d1d64c20e84005e182657379" },
+    { "description": "non-ASCII text with CRLF", "input": "café \u2615\r\n", "sha256": "499beb0d4220bfd94ea8547bcf09324aecf1c7d3d1d64c20e84005e182657379" },
+    { "description": "a BOM that is not leading is content", "input": "a\ufeff", "sha256": "7b3f2e406be832b35312bfd7bd6300df2d05744f2215e6799c943903202113c6" },
+    { "description": "only one leading BOM is removed", "input": "\ufeff\ufeffx\n", "sha256": "dc79faf9efbee8e42b42346da7a977c74a27581ae8f3465f431176f43e521415" },
+    { "description": "blank lines survive normalization", "input": "line one\r\n\r\nline three\r\n", "sha256": "92dda9e089e8e7a9ab5998b6d2abfe4b6405ff87c1b2f4166f62f497afef9ef6" }
+  ]
+}

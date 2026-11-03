@@ -1,0 +1,9 @@
+# A starter job `lampstand init` proposes. It regenerates the projections and byte-compares them with the committed
+# ones, so a stale or hand-edited projection surfaces within a day. It writes nothing into the house.
+[jobs.check]
+argv = ["lampstand", "check"]
+every = "1d"
+stale_hours = 48
+outputs = []
+mutates = []
+commit = false
