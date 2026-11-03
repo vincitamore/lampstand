@@ -37,3 +37,9 @@ and also listed under `extensions:` in your OMP config), and files in your own O
 - Before the session ends, it runs the maintenance gate.
 
 Outside a house it does nothing and says nothing; `/lampstand status` reports that there is no house there.
+
+## Windows
+
+On Windows the CLI is the `lampstand.cmd` shim, and Node and Bun refuse some characters (quotes, parentheses, `%`) in
+a batch file's arguments: a long `--body "..."` can fail with `batch file arguments are invalid`. Pass the text on
+stdin instead: `--body -`, or `lampstand capture -`.

@@ -22,7 +22,9 @@ import { parseFrontmatter } from "../frontmatter.js";
  */
 
 /**
- * A filename stem from free text: lowercase ASCII letters, digits and single hyphens, at most `max` characters.
+ * A filename stem from free text: lowercase ASCII letters, digits and single hyphens, at most `max` characters. A
+ * longer slug is cut at the last hyphen at or before the limit, so no word is left in pieces; a single word longer
+ * than the limit is cut hard.
  * @param {string} text
  * @param {number} [max]
  */
@@ -33,7 +35,9 @@ export function slugify(text, max = 60) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  return slug.slice(0, max).replace(/-+$/, "");
+  if (slug.length <= max) return slug;
+  const boundary = slug.slice(0, max + 1).lastIndexOf("-");
+  return slug.slice(0, boundary > 0 ? boundary : max).replace(/-+$/, "");
 }
 
 /**

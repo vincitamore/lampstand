@@ -159,3 +159,39 @@ test("a title that names two items is refused with both listed", async (t) => {
   assert.match(result.body.error.message, /names more than one task: tasks\/a\.md, tasks\/b\.md; give the path/);
   assert.equal((await cliJson(["task", "done", "a", "--resolution", "Landed in [[x]]"], house)).code, 0);
 });
+
+test("a status that means the work landed needs a link; dropped, withdrawn and abandoned take a plain reason", async (t) => {
+  const house = makeHouse(t);
+  for (const [args, status] of /** @type {const} */ ([
+    [["inbox", "new", "idea", "Cache the index"], "dropped"],
+    [["inbox", "new", "idea", "Cache the other index"], "adopted"],
+    [["decide", "new", "Pick a store"], "withdrawn"],
+    [["inbox", "new", "investigation", "Why is CI slow"], "abandoned"],
+    [["decide", "new", "Pick a second store"], "superseded"],
+  ])) {
+    assert.equal((await cliJson([...args], house)).code, 0);
+    const name = args.at(-1);
+    const reason = await cliJson([args[0] === "decide" ? "decide" : "inbox", args[0] === "decide" ? "resolve" : "set", name ?? "", "--status", status, "--resolution", "no longer wanted"], house);
+    const plain = ["dropped", "withdrawn", "abandoned"].includes(status);
+    assert.equal(reason.code, plain ? 0 : 64, `${status}: ${JSON.stringify(reason.body)}`);
+    if (!plain) assert.match(reason.body.error.message, /must name where the work landed with a \[\[wikilink\]\] or a URL \(only dropped, withdrawn, abandoned take a plain reason\)/);
+  }
+  const missing = await cliJson(["inbox", "set", "cache-the-other-index", "--status", "dropped"], house);
+  assert.equal(missing.code, 64);
+  assert.match(missing.body.error.message, /dropped needs --resolution "<one line reason>"/);
+  assert.equal((await cliJson(["inbox", "set", "cache-the-other-index", "--status", "adopted", "--resolution", "Landed in [[x]]"], house)).code, 0);
+});
+
+test("a long title is cut at the last whole word that fits, and a single long word is cut hard", async (t) => {
+  const { slugify } = await import("../../core/lib/org/markdown.js");
+  assert.equal(slugify("Magic sets is unsound under stratified negation unless negated predicates are adorned"), "magic-sets-is-unsound-under-stratified-negation-unless");
+  assert.equal(slugify("aaaa bbbb cccc", 9), "aaaa-bbbb", "a hyphen exactly at the limit ends the cut");
+  assert.equal(slugify("aaaa bbbb cccc", 8), "aaaa", "no hyphen at or before the limit but one: the whole words before it");
+  assert.equal(slugify("aaaa bbbb", 9), "aaaa-bbbb", "a slug at the limit is whole");
+  assert.equal(slugify("supercalifragilistic word", 10), "supercalif", "one word longer than the limit is cut hard");
+  assert.equal(slugify("ab cd", 2), "ab");
+  const house = makeHouse(t);
+  const title = "A nested-loop join degrades a recursive Datalog rule from O(n) to O(n squared) in practice";
+  const made = await cliJson(["knowledge", "new", title], house);
+  assert.equal(made.body.path, "knowledge/a-nested-loop-join-degrades-a-recursive-datalog-rule-from-o.md");
+});

@@ -11,7 +11,7 @@ import { parseFrontmatter } from "../frontmatter.js";
 import { atomicWrite, errorMessage, readText } from "../io.js";
 import { moveAndRelink } from "./links.js";
 import { editFrontmatter, isDate, maskCode, renderItem, slugify, utcDate } from "./markdown.js";
-import { fieldName, isTerminal, placeFor } from "./schema.js";
+import { fieldName, isTerminal, placeFor, UNLANDED_STATUSES } from "./schema.js";
 
 /** @typedef {import("./schema.js").Kind} Kind */
 /** @typedef {import("./schema.js").Field} Field */
@@ -259,16 +259,22 @@ export function createItem(root, schema, kind, input) {
 }
 
 /**
- * Checks a resolution: one line naming where the work landed, by a [[wikilink]] or a URL.
+ * Checks a resolution: one line. For a status that means the work landed it names where, by a [[wikilink]] or a URL;
+ * for one that means it landed nowhere (dropped, withdrawn, abandoned) it is a plain reason.
  * @param {string | undefined} resolution
+ * @param {string} status  the terminal status being set
  */
-export function checkResolution(resolution) {
+export function checkResolution(resolution, status) {
+  const unlanded = UNLANDED_STATUSES.includes(status);
   if (resolution === undefined || resolution.trim() === "") {
-    throw fail("E_USAGE", "a terminal status needs --resolution \"<one line>\" naming where the work landed ([[link]] or URL)");
+    throw fail(
+      "E_USAGE",
+      unlanded ? `${status} needs --resolution "<one line reason>"` : `a terminal status needs --resolution "<one line>" naming where the work landed ([[link]] or URL)`,
+    );
   }
   if (/[\r\n]/.test(resolution)) throw fail("E_USAGE", "--resolution is one line");
-  if (!/\[\[[^\[\]\n]+\]\]|\bhttps?:\/\/\S+/.test(resolution)) {
-    throw fail("E_USAGE", "--resolution must name where the work landed with a [[wikilink]] or a URL");
+  if (!unlanded && !/\[\[[^\[\]\n]+\]\]|\bhttps?:\/\/\S+/.test(resolution)) {
+    throw fail("E_USAGE", `--resolution must name where the work landed with a [[wikilink]] or a URL (only ${UNLANDED_STATUSES.join(", ")} take a plain reason)`);
   }
   return resolution.trim();
 }
@@ -312,7 +318,7 @@ export function transition(root, schema, item, change) {
     const wasTerminal = before !== undefined && isTerminal(kind, before) && item.place === placeFor(schema, kind, item.folder, before);
     if (change.resolution !== undefined || !wasTerminal) {
       edits[resolvedKey] = utcDate(change.now);
-      if (change.resolution !== undefined || kind.resolutionRequired) edits[resolutionKey] = checkResolution(change.resolution);
+      if (change.resolution !== undefined || kind.resolutionRequired) edits[resolutionKey] = checkResolution(change.resolution, status);
     }
   } else {
     if (change.resolution !== undefined) throw fail("E_USAGE", `--resolution applies only to a terminal status (${kind.terminal.join(", ")})`);

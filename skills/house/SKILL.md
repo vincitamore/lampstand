@@ -39,7 +39,8 @@ Run `lampstand <verb> --help` for flags; add `--json` for one machine-readable o
 
 - **Work:** `task new|list|set|done`, `capture "<text>"`, `inbox new|list|set`, `decide new|resolve`,
   `knowledge new|list`, `remind new|list|done`. Pass long Markdown as `--body -` on stdin (`capture -` likewise), never
-  inside shell quotes: a backtick in double quotes runs as a command.
+  inside shell quotes: a backtick in double quotes runs as a command, and on Windows the `lampstand.cmd` shim refuses
+  many quotes and parentheses in an argument (`batch file arguments are invalid`).
 - **Truth upkeep:** `status --orient`, `lint`, `relink <old> <new>` (after any move), `compile [--check]`.
 - **The constitution:** `propose principle|provision|reflex <file> --occasion "<what happened>"`, `adopt` (the
   operator's act, item by item, committed). The file is `<slug>.md` (lowercase letters, digits, hyphens);
@@ -54,8 +55,9 @@ Run `lampstand <verb> --help` for flags; add `--json` for one machine-readable o
 ## Rules that hold every session
 
 1. **Resolve in the same breath as the work.** When a task, decision or investigation is done, close it with
-   `--resolution "<one line naming where it landed, as a [[link]]>"`. The verb moves the file to `resolved/` and fixes
-   links. Never leave resolution for a later tidy-up.
+   `--resolution "<one line naming where it landed, as a [[link]]>"`. Only `dropped`, `withdrawn` and `abandoned` take
+   a plain reason instead; every other terminal status needs the link. The verb moves the file to `resolved/` and
+   fixes links. Never leave resolution for a later tidy-up.
 2. **Files are written through verbs** where a verb exists. Hand edits to frontmatter skip the checks the verbs make.
 3. **A changed normative file is recompiled.** After editing anything under `principles/`, `charter/`, `reflexes/` or
    `voice.md`, run `lampstand compile`; `compile --check` failing means the projections are stale.

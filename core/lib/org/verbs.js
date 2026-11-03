@@ -166,7 +166,7 @@ function runCreate(context, kindName, extra = {}) {
 
 const BODY = { body: { type: /** @type {const} */ ("string"), summary: "text to put under the title, or - to read it from stdin" } };
 const RESOLUTION = {
-  resolution: { type: /** @type {const} */ ("string"), summary: "one line naming where the work landed: a [[wikilink]] or a URL" },
+  resolution: { type: /** @type {const} */ ("string"), summary: "one line naming where the work landed: a [[wikilink]] or a URL; for dropped, withdrawn or abandoned, a plain reason" },
 };
 const LIST_FLAGS = {
   all: { type: /** @type {const} */ ("boolean"), summary: "include resolved items" },

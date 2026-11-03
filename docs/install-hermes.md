@@ -43,3 +43,9 @@ hermes
 
 Messaging surfaces and scheduled jobs have no working folder, so they use the house recorded with
 `lampstand init --default`, and nothing else.
+
+## Windows
+
+On Windows the CLI is the `lampstand.cmd` shim, and Node and Bun refuse some characters (quotes, parentheses, `%`) in
+a batch file's arguments: a long `--body "..."` can fail with `batch file arguments are invalid`. Pass the text on
+stdin instead: `--body -`, or `lampstand capture -`.
