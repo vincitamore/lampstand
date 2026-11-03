@@ -1,15 +1,9 @@
-```
-▄█    ▄█    ▄█    ▄█    ▄█
-▀▀    ▀▀    ▀▀    ▀▀    ▀▀
-██    ██    ██    ██    ██        ██                                      ██                        ██
-██    ██    ██    ██    ██        ██                                      ██                        ██
-██    ██████████████    ██        ██  ██████  ██████████  ██████  ██████  ████  ██████  ██████  ██████
-██          ██          ██        ██  ▄▄▄▄██  ██  ██  ██  ██  ██  ██▄▄▄▄  ██    ▄▄▄▄██  ██  ██  ██  ██
-██████████████████████████        ██  ██▀▀██  ██  ██  ██  ██  ██  ▀▀▀▀██  ██    ██▀▀██  ██  ██  ██  ██
-            ██                    ██  ██████  ██  ██  ██  ██████  ██████  ████  ██████  ██  ██  ██████
-            ██                                            ██
-      ██████████████                                      ██
-```
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vincitamore/lampstand/dev/docs/assets/lampstand-lockup-dark.svg">
+    <img alt="lampstand" src="https://raw.githubusercontent.com/vincitamore/lampstand/dev/docs/assets/lampstand-lockup-light.svg" width="520">
+  </picture>
+</p>
 
 lampstand gives your coding agent a house: a git repository you own that holds the principles and rules it works
 under, its tasks, decisions and knowledge, and the machinery that keeps them true. It installs as a plugin into
