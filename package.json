@@ -1,0 +1,44 @@
+{
+  "name": "lampstand",
+  "version": "0.1.0",
+  "description": "Plants a house: a git repository you own that holds your agent's principles, rules, tasks, decisions and knowledge as plain files.",
+  "license": "MIT",
+  "author": "vincitamore",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "bin": {
+    "lampstand": "./core/bin/lampstand.js"
+  },
+  "omp": {
+    "extensions": ["./hosts/omp/index.ts"]
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\"",
+    "check": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "@types/node": "22.13.17",
+    "typescript": "5.9.3"
+  },
+  "files": [
+    "__init__.py",
+    "plugin.yaml",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "skills/",
+    "agents/",
+    "rules/",
+    "commands/",
+    "core/",
+    "hosts/",
+    "schema/",
+    "templates/",
+    "packs/",
+    "docs/"
+  ]
+}

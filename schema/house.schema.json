@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "house.toml",
+  "description": "The marker and manifest at the root of a house. house.schema is the version of this schema; its maximum is the newest version this lampstand understands.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "house"
+  ],
+  "properties": {
+    "house": {
+      "type": "object",
+      "required": [
+        "schema",
+        "id",
+        "name"
+      ],
+      "properties": {
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "operator": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "co_owners": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "purpose": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "maxLength": 600
+        }
+      }
+    },
+    "charter": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "rules",
+            "agreement"
+          ]
+        },
+        "ask_first": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "type": "string",
+          "enum": [
+            "lean",
+            "standard",
+            "large"
+          ]
+        }
+      }
+    },
+    "modules": {
+      "type": "object",
+      "properties": {
+        "scheduler": {
+          "type": "boolean"
+        },
+        "rooms": {
+          "type": "boolean"
+        },
+        "residents": {
+          "type": "boolean"
+        },
+        "watchdog": {
+          "type": "boolean"
+        },
+        "orchestration": {
+          "type": "boolean"
+        }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "off",
+            "remind",
+            "block"
+          ]
+        }
+      }
+    },
+    "plugin": {
+      "type": "object",
+      "properties": {
+        "min": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        }
+      }
+    },
+    "packs": {
+      "type": "object",
+      "properties": {
+        "principles": {
+          "type": "string"
+        }
+      }
+    },
+    "reflexes": {
+      "type": "object",
+      "description": "How the reflexes load. The worker always carries each reflex in full.",
+      "properties": {
+        "router": {
+          "type": "string",
+          "enum": [
+            "index",
+            "full"
+          ],
+          "description": "What the router's one Reflexes section carries in main sessions: index (the default) is one line per reflex; full is each reflex's whole text, as the worker carries it. Either way the section is measured as the reflex-index surface, under [surfaces.reflex-index].cap."
+        }
+      }
+    },
+    "surfaces": {
+      "type": "object",
+      "description": "L0, the surface registry. Six names are surfaces the compiler measures, each the [surfaces] name of the manifest keys it caps: kernel (manifest key kernel), principle-detail (principle-detail), charter-core (charter-core), reflex-index (reflex-index:<host>, one per host), voice (voice) and worker (worker:<host>, one per host). Any other name registers a surface the compiler does not measure.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "loads": {
+            "type": "string",
+            "enum": [
+              "always",
+              "session",
+              "subagent",
+              "on-demand"
+            ]
+          },
+          "cap": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The surface's cap in characters, replacing the budget profile's default. It rises only by the operator's edit: in rules and agreement mode a compile that raises a cap and grows the surface it caps is refused, so a raise is compiled and committed before the text grows. The kernel cap never rises above 4000 (Hermes's kernel prompt section, measured with its framing); a higher one is refused. The worker cap is W's room beyond K: it rises freely for OMP, which imposes no limit, while on Hermes it stops at 20000, what fits Hermes's 32000-character subagent context beside K and a role brief."
+          }
+        }
+      }
+    }
+  }
+}

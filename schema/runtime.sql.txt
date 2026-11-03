@@ -1,0 +1,58 @@
+-- Per-machine runtime state in house.db. Machine state only: nothing authored lives only here, and the database can
+-- be deleted and rebuilt.
+--
+-- Forward-only migrations. Each step begins with a line `-- migration N`, numbered from 1 without gaps, and runs in
+-- one transaction that also records N as meta.schema_version. A released step is never edited; changes are new
+-- steps appended at the end.
+
+-- migration 1
+CREATE TABLE meta (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+) STRICT;
+
+CREATE TABLE job_runs (
+  id INTEGER PRIMARY KEY,
+  job TEXT NOT NULL,
+  started_at TEXT NOT NULL,
+  finished_at TEXT,
+  outcome TEXT,
+  detail TEXT NOT NULL DEFAULT ''
+) STRICT;
+
+CREATE INDEX job_runs_by_job ON job_runs (job, started_at);
+
+CREATE TABLE events (
+  id INTEGER PRIMARY KEY,
+  at TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT '',
+  payload TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(payload))
+) STRICT;
+
+CREATE INDEX events_by_kind ON events (kind, at);
+
+-- migration 2
+-- Write governance: each run's exit status, the paths it landed, the commit that carries them and what started it;
+-- one lock row per job (and one for the house's landing step) so concurrent runs never share a job or a commit; and
+-- the scheduler's small key-value memory (last tick, last failure signature for deduplicated captures).
+ALTER TABLE job_runs ADD COLUMN run_id TEXT;
+ALTER TABLE job_runs ADD COLUMN trigger TEXT NOT NULL DEFAULT 'manual';
+ALTER TABLE job_runs ADD COLUMN exit_code INTEGER;
+ALTER TABLE job_runs ADD COLUMN landed TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(landed));
+ALTER TABLE job_runs ADD COLUMN commit_sha TEXT;
+
+CREATE UNIQUE INDEX job_runs_by_run_id ON job_runs (run_id);
+
+CREATE TABLE job_locks (
+  name TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL,
+  pid INTEGER NOT NULL,
+  host TEXT NOT NULL,
+  acquired_at TEXT NOT NULL
+) STRICT;
+
+CREATE TABLE scheduler_state (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+) STRICT;

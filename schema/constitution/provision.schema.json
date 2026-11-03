@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "provision file frontmatter",
+  "description": "Frontmatter of charter/provisions/*.md. The body opens with a level-1 heading naming the provision. gates names every gate the provision relies on; each must exist. occasion is checked by the curation rules rather than required here, so its absence is reported as a finding naming the rule. x-proposal-required lists what a file under proposals/provisions/ must carry instead of required.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["adopted", "adopted-hash"],
+  "x-proposal-required": ["proposed"],
+  "properties": {
+    "occasion": { "type": "string" },
+    "proposed": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "adopted": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "adopted-hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "gates": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" } }
+  }
+}

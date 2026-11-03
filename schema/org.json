@@ -1,0 +1,109 @@
+{
+  "$comment": "The org substrate's schema as data, read by core/lib/org/schema.js. Each kind names the folder new items are written to, its statuses, the terminal ones (reaching one sets resolved_fields and moves the file into <folder>/resolved/), the status an item without a status field has, and the frontmatter fields every item of the kind carries. The field `kind` names an item's kind and its value is the kind's name. house.toml [org] may add kinds, statuses and folders, never remove these, and may say how a house that predates lampstand names and places its items; house_toml is the JSON Schema subset that table is validated against.",
+  "version": 1,
+  "resolved_folder": "resolved",
+  "resolved_fields": ["resolved", "resolution"],
+  "kinds": {
+    "task": {
+      "folder": "tasks",
+      "statuses": ["open", "active", "blocked", "done", "dropped"],
+      "terminal": ["done", "dropped"],
+      "initial": "open",
+      "required": ["kind", "title", "status", "created"]
+    },
+    "capture": {
+      "folder": "inbox/captures",
+      "statuses": ["open", "filed", "dropped"],
+      "terminal": ["filed", "dropped"],
+      "initial": "open",
+      "required": ["kind", "created"]
+    },
+    "idea": {
+      "folder": "inbox/ideas",
+      "statuses": ["open", "adopted", "dropped"],
+      "terminal": ["adopted", "dropped"],
+      "initial": "open",
+      "required": ["kind", "title", "status", "created"]
+    },
+    "decision": {
+      "folder": "inbox/decisions",
+      "statuses": ["open", "decided", "superseded", "withdrawn"],
+      "terminal": ["decided", "superseded", "withdrawn"],
+      "initial": "open",
+      "required": ["kind", "title", "status", "created"]
+    },
+    "investigation": {
+      "folder": "inbox/investigations",
+      "statuses": ["open", "active", "concluded", "abandoned"],
+      "terminal": ["concluded", "abandoned"],
+      "initial": "open",
+      "required": ["kind", "title", "status", "created"]
+    },
+    "knowledge": {
+      "folder": "knowledge",
+      "statuses": ["current", "superseded"],
+      "terminal": ["superseded"],
+      "initial": "current",
+      "required": ["kind", "title", "status", "created"]
+    },
+    "reminder": {
+      "folder": "reminders",
+      "statuses": ["open", "done", "dropped"],
+      "terminal": ["done", "dropped"],
+      "initial": "open",
+      "required": ["kind", "title", "status", "created", "due"]
+    }
+  },
+  "house_toml": {
+    "description": "house.toml [org]. kind_field is the frontmatter field that names an item's kind (default kind); title_fallback = \"heading\" lets the first level-1 heading of the body stand in for an absent title field; not_items lists globs of house-relative paths (* within one folder name, ? one character, a ** segment any number of folders, matched case-sensitively) naming Markdown files in org folders that are not items: they are never read or linted as items, and their links are still checked; missing_frontmatter = \"error\" makes a file with no frontmatter in an org folder a lint error (default \"info\": information that it is not read as an item). [org.kinds.<name>] for a kind not above defines it (folder, statuses and terminal required; initial defaults to the first status, required to kind, title, status, created). For a kind above, folder, initial and required may not be given; statuses, terminal (new statuses only) and folders are added to the defaults. For any kind: kind_value is the value of kind_field that names it (default its name); nested = true also reads items from subfolders of its folders; status_folders maps a status to the one folder items with that status live in (a status not named there lives in the kind's folder, or its resolved/ folder when terminal), and a folder named by exactly one status implies that status for an item there without a status field; lists names fields that, when given (not absent, null or empty), must hold a list; fields maps a field lampstand reads and writes (title, status, created, due, resolved, resolution) to the name this house's items use for it, everywhere lampstand reads or writes it; resolution_required = false lets a terminal item of the kind go without a resolution line (default true: a terminal item carries both resolved and resolution). Cross-field rules are checked by core/lib/org/schema.js.",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "kind_field": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*$" },
+      "title_fallback": { "type": "string", "enum": ["heading"] },
+      "not_items": {
+        "type": "array",
+        "items": { "type": "string", "pattern": "^(?!/)[^\\\\]*[^/\\\\]$" }
+      },
+      "missing_frontmatter": { "type": "string", "enum": ["info", "error"] },
+      "kinds": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "folder": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*(/[A-Za-z0-9_][A-Za-z0-9._-]*)*$" },
+            "folders": {
+              "type": "array",
+              "items": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*(/[A-Za-z0-9_][A-Za-z0-9._-]*)*$" }
+            },
+            "statuses": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" } },
+            "terminal": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" } },
+            "initial": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" },
+            "required": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" } },
+            "kind_value": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*$" },
+            "nested": { "type": "boolean" },
+            "status_folders": {
+              "type": "object",
+              "additionalProperties": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*(/[A-Za-z0-9_][A-Za-z0-9._-]*)*$" }
+            },
+            "lists": { "type": "array", "items": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*$" } },
+            "fields": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "title": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*$" },
+                "status": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*$" },
+                "created": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*$" },
+                "due": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*$" },
+                "resolved": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*$" },
+                "resolution": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*$" }
+              }
+            },
+            "resolution_required": { "type": "boolean" }
+          }
+        }
+      }
+    }
+  }
+}

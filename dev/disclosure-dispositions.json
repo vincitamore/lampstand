@@ -1,0 +1,34 @@
+{
+  "dynamic": [
+    {
+      "file": "core/lib/governance/run.js",
+      "expression": "argv[0]",
+      "covers": ["The commands you declare as jobs"],
+      "why": "lampstand run starts the argv a job declares in house.toml [jobs]; the program is the user's choice"
+    },
+    {
+      "file": "core/lib/governance/spawn.js",
+      "expression": "shell",
+      "covers": ["cmd.exe"],
+      "why": "a batch file on PATH runs under %ComSpec%, the Windows command interpreter, falling back to cmd.exe"
+    },
+    {
+      "file": "core/lib/doctor/util.js",
+      "expression": "file",
+      "covers": ["`omp`", "`agora`"],
+      "why": "doctor's runner starts the executables its fact gatherers found with which(): omp and agora"
+    },
+    {
+      "file": "core/lib/doctor/util.js",
+      "expression": "`\"${file}\" ${args.join(\" \")}`",
+      "covers": ["`omp`", "`agora`"],
+      "why": "the same runner for a .cmd or .bat shim of omp or agora on Windows, which only the shell can start"
+    },
+    {
+      "file": "core/lib/constitution/verbs.js",
+      "expression": "`${editor} \"${path}\"`",
+      "covers": ["$VISUAL", "$EDITOR"],
+      "why": "choosing edit in lampstand adopt opens the proposal in the user's $VISUAL or $EDITOR through the shell"
+    }
+  ]
+}

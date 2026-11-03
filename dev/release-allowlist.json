@@ -1,0 +1,23 @@
+{
+  "include": [
+    "package.json",
+    "plugin.yaml",
+    "__init__.py",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "skills/**",
+    "agents/**",
+    "rules/**",
+    "commands/**",
+    "core/**",
+    "hosts/**",
+    "schema/**",
+    "templates/**",
+    "packs/**",
+    "docs/**"
+  ],
+  "exclude": []
+}

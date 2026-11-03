@@ -1,0 +1,7 @@
+# A write lampstand interrupts can leave its temp file beside the target; it is never part of the house.
+.*.tmp
+
+# OS clutter
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,131 @@
+name: release-gates
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    name: gates / ubuntu-latest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22.13"
+      # Every gate runs even when an earlier one fails, so one run reports every finding.
+      - name: prose
+        run: node dev/prose-gate.js
+      - name: leak
+        if: success() || failure()
+        run: node dev/leak-gate.js
+      - name: links
+        if: success() || failure()
+        run: node dev/link-check.js
+      - name: skills and agents
+        if: success() || failure()
+        run: node dev/skills-validate.js
+      - name: context budget
+        if: success() || failure()
+        run: node dev/context-budget.js
+      - name: disclosure
+        if: success() || failure()
+        run: node dev/disclosure-check.js
+      - name: release tree
+        if: success() || failure()
+        run: node dev/release.js --out "$RUNNER_TEMP/release/tree" --manifest "$RUNNER_TEMP/release/manifest.json"
+
+  hermes-scan:
+    name: hermes scan / ubuntu-latest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HERMES_REPO: https://github.com/NousResearch/hermes-agent
+      HERMES_HOME: ${{ runner.temp }}/hermes-home
+      HERMES_DIR: ${{ runner.temp }}/hermes-agent
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      # The scan gate builds the release tree with dev/release.js before scanning it.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22.13"
+      - name: read the Hermes floor from plugin.yaml
+        id: floor
+        run: |
+          floor="$(sed -nE 's/^requires_hermes:[[:space:]]*["'\'']?>=[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' plugin.yaml)"
+          test -n "$floor" || { echo "plugin.yaml has no requires_hermes >=X.Y.Z floor" >&2; exit 1; }
+          # The tag object and, for an annotated tag, the commit it points at; the commit is what --commit pins.
+          refs="$(git ls-remote "$HERMES_REPO.git" "refs/tags/v$floor" "refs/tags/v$floor^{}")"
+          sha="$(printf '%s\n' "$refs" | awk '/\^\{\}$/ {print $1}')"
+          test -n "$sha" || sha="$(printf '%s\n' "$refs" | awk 'NR == 1 {print $1}')"
+          test -n "$sha" || { echo "no tag v$floor in $HERMES_REPO" >&2; exit 1; }
+          echo "version=$floor" >> "$GITHUB_OUTPUT"
+          echo "commit=$sha" >> "$GITHUB_OUTPUT"
+      # The installer's own non-interactive mode (scripts/install.sh --help): --commit pins the floor's release commit,
+      # --non-interactive skips setup and gateway configuration, and the browser and computer-use tools are left out
+      # because validation does not use them. The script is taken from the same tag it installs.
+      - name: install Hermes ${{ steps.floor.outputs.version }}
+        env:
+          HERMES_VERSION: ${{ steps.floor.outputs.version }}
+          HERMES_COMMIT: ${{ steps.floor.outputs.commit }}
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/NousResearch/hermes-agent/v$HERMES_VERSION/scripts/install.sh" \
+            -o "$RUNNER_TEMP/hermes-install.sh"
+          bash "$RUNNER_TEMP/hermes-install.sh" --commit "$HERMES_COMMIT" --non-interactive \
+            --skip-browser --skip-computer-use --hermes-home "$HERMES_HOME" --dir "$HERMES_DIR"
+      # Validation runs from the install's dependency venv, the interpreter that imports hermes_cli: PM records it in
+      # installs/<key>/facts.json; any other venv under installs/ is used only if it imports Hermes.
+      - name: find the install's Python
+        id: python
+        run: |
+          python - <<'EOF' >> "$GITHUB_OUTPUT"
+          import glob, json, os, subprocess
+          home = os.environ["HERMES_HOME"]
+          candidates = []
+          for facts in sorted(glob.glob(os.path.join(home, "installs", "*", "facts.json"))):
+              env = json.load(open(facts, encoding="utf-8")).get("packages", {}).get("venv", {}).get("environment")
+              if env:
+                  candidates.append(os.path.join(env, "bin", "python"))
+          candidates += sorted(glob.glob(os.path.join(home, "installs", "*", "environments", "*", "venv", "bin", "python")))
+          for python in candidates:
+              probe = [python, "-P", "-c", "import hermes_cli.main, tools.plugin_guard"]
+              if os.path.exists(python) and subprocess.run(probe, capture_output=True).returncode == 0:
+                  print(f"path={python}")
+                  break
+          else:
+              raise SystemExit(f"no Python under {home}/installs imports hermes_cli")
+          EOF
+      - name: scan gate
+        env:
+          HERMES_PYTHON: ${{ steps.python.outputs.path }}
+        run: |
+          set -o pipefail
+          python dev/scan-gate.py "$HERMES_PYTHON" | tee "$RUNNER_TEMP/scan-gate.txt"
+      - name: record what ran
+        if: success() || failure()
+        env:
+          HERMES_VERSION: ${{ steps.floor.outputs.version }}
+          HERMES_COMMIT: ${{ steps.floor.outputs.commit }}
+          HERMES_PYTHON: ${{ steps.python.outputs.path }}
+        run: |
+          {
+            echo "## Hermes scan gate"
+            echo
+            echo "- Hermes: v$HERMES_VERSION (the plugin.yaml requires_hermes floor), commit \`$HERMES_COMMIT\`"
+            echo "- Installed by: \`install.sh --commit $HERMES_COMMIT --non-interactive --skip-browser --skip-computer-use\`"
+            echo "- Checkout: \`$(git -C "$HERMES_DIR" describe --tags --always 2>/dev/null || echo 'not installed')\`"
+            echo "- Python: \`${HERMES_PYTHON:-not found}\`"
+            echo "- Ran: \`python dev/scan-gate.py \"\$HERMES_PYTHON\"\` on the release tree dev/release.js builds from \`$(git rev-parse HEAD)\`"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/scan-gate.txt" 2>/dev/null || echo "the scan gate did not run"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

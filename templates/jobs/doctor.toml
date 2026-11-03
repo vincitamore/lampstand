@@ -1,0 +1,9 @@
+# A starter job `lampstand init` proposes. doctor --quick checks the plugin's own wiring; its health line shows
+# whether the house has been looked after recently. It writes nothing into the house.
+[jobs.doctor]
+argv = ["lampstand", "doctor", "--quick"]
+every = "1d"
+stale_hours = 48
+outputs = []
+mutates = []
+commit = false

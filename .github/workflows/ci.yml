@@ -1,0 +1,46 @@
+name: ci
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+jobs:
+  node:
+    name: node ${{ matrix.node }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        # The engines floor and the newest release.
+        node: ["22.13", "latest"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+      # Hermes supports Python 3.11 and newer; testing on the floor catches newer-only syntax.
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - run: npm ci --no-audit --no-fund
+      - run: npx tsc --noEmit -p .
+      - run: node --test "test/**/*.test.js"
+      - run: python -m unittest discover -s test
+      - run: node dev/version-sync.js
+      - run: node dev/clean-room-check.js
+
+  bun:
+    name: bun / ubuntu-latest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+      - run: bun test test/
+      - run: bun dev/version-sync.js
+      - run: bun dev/clean-room-check.js

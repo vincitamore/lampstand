@@ -1,0 +1,13 @@
+{
+  "description": "What lampstand init plants for the constitution's layers L1 to L6, apart from principles. Each entry copies template to destination, only when the destination is missing; when names a house.toml key and the value it must hold. A {{name}} placeholder is replaced by the operator's answer, verbatim. L1 (purpose) and the ask-first lines are answers written to house.toml ([purpose] text, [charter] ask_first), so no file is planted for them.",
+  "files": [
+    { "template": "charter/core.none.md", "destination": "charter/core.md", "when": { "charter.mode": "none" } },
+    { "template": "charter/core.rules.md", "destination": "charter/core.md", "when": { "charter.mode": "rules" } },
+    { "template": "charter/core.agreement.md", "destination": "charter/core.md", "when": { "charter.mode": "agreement" }, "placeholders": ["operator"] },
+    { "template": "charter/record.md", "destination": "charter/record.md" },
+    { "template": "reflexes/INDEX.md", "destination": "reflexes/INDEX.md" },
+    { "template": "voice.md", "destination": "voice.md", "placeholders": ["channel_manners"] },
+    { "template": "curation.md", "destination": "curation.md" },
+    { "template": "state/current.md", "destination": "state/current.md" }
+  ]
+}

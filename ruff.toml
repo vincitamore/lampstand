@@ -1,0 +1,6 @@
+# Hermes supports Python 3.11 and newer; hosts/hermes must import on its floor.
+target-version = "py311"
+line-length = 120
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP"]

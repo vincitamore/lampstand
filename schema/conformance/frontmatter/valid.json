@@ -1,0 +1,228 @@
+{
+  "about": "Markdown frontmatter inside lampstand's YAML subset. Parsing `input` yields `expected`: frontmatter (a mapping, or null when the file has none), body (the text after the closing fence, LF-normalized, BOM removed) and bodyLine (the 1-based file line where the body starts).",
+  "vectors": [
+    {
+      "description": "no frontmatter",
+      "input": "# Title\n\nText.\n",
+      "expected": { "frontmatter": null, "body": "# Title\n\nText.\n", "bodyLine": 1 }
+    },
+    {
+      "description": "a fence that is not on the first line is not frontmatter",
+      "input": "\n---\na: 1\n---\n",
+      "expected": { "frontmatter": null, "body": "\n---\na: 1\n---\n", "bodyLine": 1 }
+    },
+    {
+      "description": "a thematic break with text after the dashes is not a fence",
+      "input": "--- not a fence\ntext\n",
+      "expected": { "frontmatter": null, "body": "--- not a fence\ntext\n", "bodyLine": 1 }
+    },
+    {
+      "description": "empty file",
+      "input": "",
+      "expected": { "frontmatter": null, "body": "", "bodyLine": 1 }
+    },
+    {
+      "description": "empty frontmatter",
+      "input": "---\n---\nbody\n",
+      "expected": { "frontmatter": {}, "body": "body\n", "bodyLine": 3 }
+    },
+    {
+      "description": "frontmatter of comments and blank lines only",
+      "input": "---\n# nothing here\n\n---\n",
+      "expected": { "frontmatter": {}, "body": "", "bodyLine": 5 }
+    },
+    {
+      "description": "a file that ends at the closing fence without a newline",
+      "input": "---\na: 1\n---",
+      "expected": { "frontmatter": { "a": 1 }, "body": "", "bodyLine": 4 }
+    },
+    {
+      "description": "fences may carry trailing whitespace",
+      "input": "---  \na: 1\n--- \t\nbody",
+      "expected": { "frontmatter": { "a": 1 }, "body": "body", "bodyLine": 4 }
+    },
+    {
+      "description": "an Agent Skills SKILL.md",
+      "input": "---\nname: pdf-tools\ndescription: Extract text and tables from PDF files. Use when the user mentions PDFs.\nlicense: MIT\nallowed-tools: [Read, Bash]\nmetadata:\n  author: example\n  version: \"1.0\"\n---\n# PDF tools\n",
+      "expected": {
+        "frontmatter": {
+          "name": "pdf-tools",
+          "description": "Extract text and tables from PDF files. Use when the user mentions PDFs.",
+          "license": "MIT",
+          "allowed-tools": ["Read", "Bash"],
+          "metadata": { "author": "example", "version": "1.0" }
+        },
+        "body": "# PDF tools\n",
+        "bodyLine": 10
+      }
+    },
+    {
+      "description": "core-schema scalars",
+      "input": "---\nn1: null\nn2: ~\nn3:\nn4: NULL\nb1: true\nb2: False\nb3: TRUE\ni1: 42\ni2: -7\ni3: +3\ni4: 0\nf1: 3.5\nf2: -0.25\nf3: 1e3\nf4: .5\nf5: 2.\ns1: hello world\ns2: 1.2.3\ns3: v1\n---\n",
+      "expected": {
+        "frontmatter": {
+          "n1": null, "n2": null, "n3": null, "n4": null,
+          "b1": true, "b2": false, "b3": true,
+          "i1": 42, "i2": -7, "i3": 3, "i4": 0,
+          "f1": 3.5, "f2": -0.25, "f3": 1000, "f4": 0.5, "f5": 2,
+          "s1": "hello world", "s2": "1.2.3", "s3": "v1"
+        },
+        "body": "",
+        "bodyLine": 22
+      }
+    },
+    {
+      "description": "dates and timestamps stay strings",
+      "input": "---\ncreated: 2026-11-02\nat: 2026-11-02T10:30:00Z\nlocal: 2026-11-02 10:30:00\n---\n",
+      "expected": {
+        "frontmatter": { "created": "2026-11-02", "at": "2026-11-02T10:30:00Z", "local": "2026-11-02 10:30:00" },
+        "body": "",
+        "bodyLine": 6
+      }
+    },
+    {
+      "description": "plain scalars may hold colons and hashes not followed or preceded by whitespace",
+      "input": "---\nurl: https://example.com/a#frag\ntime: 10:30\nkey:value: x\nissue: a#1 # a comment\n---\n",
+      "expected": {
+        "frontmatter": { "url": "https://example.com/a#frag", "time": "10:30", "key:value": "x", "issue": "a#1" },
+        "body": "",
+        "bodyLine": 7
+      }
+    },
+    {
+      "description": "single-quoted scalars",
+      "input": "---\na: 'it''s'\nb: 'no \\escapes here'\nc: ''\nd: 'true'\ne: '# not a comment'\n---\n",
+      "expected": {
+        "frontmatter": { "a": "it's", "b": "no \\escapes here", "c": "", "d": "true", "e": "# not a comment" },
+        "body": "",
+        "bodyLine": 8
+      }
+    },
+    {
+      "description": "double-quoted scalars and escapes",
+      "input": "---\na: \"line\\nnext\\ttab \\\"q\\\" \\\\ \\u00e9 \\x41 \\U0001F600\"\nb: \"123\"\nc: \"null\"\nd: \"a: b # c\"\n---\n",
+      "expected": {
+        "frontmatter": { "a": "line\nnext\ttab \"q\" \\ é A \ud83d\ude00", "b": "123", "c": "null", "d": "a: b # c" },
+        "body": "",
+        "bodyLine": 7
+      }
+    },
+    {
+      "description": "quoted keys and keys with spaces",
+      "input": "---\n\"quoted: key\": 1\n'single': 2\nkey with spaces: 3\n123: numeric key stays a string\n---\n",
+      "expected": {
+        "frontmatter": { "quoted: key": 1, "single": 2, "key with spaces": 3, "123": "numeric key stays a string" },
+        "body": "",
+        "bodyLine": 7
+      }
+    },
+    {
+      "description": "block sequences, indented and at the same indentation as their key",
+      "input": "---\nindented:\n  - a\n  - 2\n  -\n  - [x, y]\nflush:\n- one\n- two\nafter: end\n---\n",
+      "expected": {
+        "frontmatter": { "indented": ["a", 2, null, ["x", "y"]], "flush": ["one", "two"], "after": "end" },
+        "body": "",
+        "bodyLine": 12
+      }
+    },
+    {
+      "description": "mappings inside sequences, compact and nested",
+      "input": "---\nsteps:\n  - name: build\n    run: make\n    env:\n      CI: true\n  - name: test\n    tags:\n    - fast\n    - unit\n  -\n    name: deploy\n---\n",
+      "expected": {
+        "frontmatter": {
+          "steps": [
+            { "name": "build", "run": "make", "env": { "CI": true } },
+            { "name": "test", "tags": ["fast", "unit"] },
+            { "name": "deploy" }
+          ]
+        },
+        "body": "",
+        "bodyLine": 14
+      }
+    },
+    {
+      "description": "sequences of sequences",
+      "input": "---\nm:\n  - - a\n    - b\n  - - c\n---\n",
+      "expected": { "frontmatter": { "m": [["a", "b"], ["c"]] }, "body": "", "bodyLine": 7 }
+    },
+    {
+      "description": "nested mappings at varying indentation",
+      "input": "---\na:\n    b:\n      c: 1\n    d: 2\ne: 3\n---\n",
+      "expected": { "frontmatter": { "a": { "b": { "c": 1 }, "d": 2 }, "e": 3 }, "body": "", "bodyLine": 8 }
+    },
+    {
+      "description": "flow sequences: empty, nested, quoted and plain elements, trailing comma, comment",
+      "input": "---\na: []\nb: [ 1, two, \"three, 3\", 'four' ]\nc: [[1, 2], [], [null, true]]\nd: [x, y,] # trailing comma\ne: [2026-11-02, 1.5, a b]\n---\n",
+      "expected": {
+        "frontmatter": {
+          "a": [],
+          "b": [1, "two", "three, 3", "four"],
+          "c": [[1, 2], [], [null, true]],
+          "d": ["x", "y"],
+          "e": ["2026-11-02", 1.5, "a b"]
+        },
+        "body": "",
+        "bodyLine": 8
+      }
+    },
+    {
+      "description": "comments between entries and after values",
+      "input": "---\n# leading\na: 1 # one\n\n  # indented comment\nb:   # value on next lines\n  - x # item\n---\n",
+      "expected": { "frontmatter": { "a": 1, "b": ["x"] }, "body": "", "bodyLine": 9 }
+    },
+    {
+      "description": "a literal block scalar keeps its line breaks and clips to one final break",
+      "input": "---\nname: x\ndescription: |\n  text\n  more\n\n  after a blank\n---\nBody\n",
+      "expected": { "frontmatter": { "name": "x", "description": "text\nmore\n\nafter a blank\n" }, "body": "Body\n", "bodyLine": 9 }
+    },
+    {
+      "description": "block scalar chomping: clip, strip (-) and keep (+)",
+      "input": "---\nclip: |\n  a\n\nstrip: |-\n  b\n\nkeep: |+\n  c\n\n\nnext: 1\n---\n",
+      "expected": { "frontmatter": { "clip": "a\n", "strip": "b", "keep": "c\n\n\n", "next": 1 }, "body": "", "bodyLine": 14 }
+    },
+    {
+      "description": "a folded block scalar joins lines with spaces, keeps empty lines as breaks and more-indented lines as they are",
+      "input": "---\nf: >\n  one\n  two\n\n  three\n    indented\n  four\ng: >-\n  x\n  y\n---\n",
+      "expected": { "frontmatter": { "f": "one two\nthree\n  indented\nfour\n", "g": "x y" }, "body": "", "bodyLine": 13 }
+    },
+    {
+      "description": "block scalars in a sequence and a compact mapping keep # lines and deeper indentation as text",
+      "input": "---\nl:\n  - |\n    # not a comment\n      deeper\n  - k: >\n      folded\n      text\n    m: 1\n---\n",
+      "expected": { "frontmatter": { "l": ["# not a comment\n  deeper\n", { "k": "folded text\n", "m": 1 }] }, "body": "", "bodyLine": 11 }
+    },
+    {
+      "description": "empty block scalars",
+      "input": "---\na: |\nb: >-\n\nc: 1\n---\n",
+      "expected": { "frontmatter": { "a": "", "b": "", "c": 1 }, "body": "", "bodyLine": 7 }
+    },
+    {
+      "description": "flow mappings: nested, quoted keys, JSON-style entries, empty values, inside a flow sequence",
+      "input": "---\na: {b: 1, 'c d': [x, y], e: {f: ~}, g: }\nsig: {\"algorithm\":\"Ed25519\",\"n\":2}\nl: [{k: v}, {}]\n---\n",
+      "expected": {
+        "frontmatter": { "a": { "b": 1, "c d": ["x", "y"], "e": { "f": null }, "g": null }, "sig": { "algorithm": "Ed25519", "n": 2 }, "l": [{ "k": "v" }, {}] },
+        "body": "",
+        "bodyLine": 6
+      }
+    },
+    {
+      "description": "flow collections across lines indented past their key, with comments",
+      "input": "---\ntags: [a, b,\n       c]  # comment\nm: {x: 1,\n  # inside\n  y: [2,\n    3]}\nafter: true\n---\n",
+      "expected": { "frontmatter": { "tags": ["a", "b", "c"], "m": { "x": 1, "y": [2, 3] }, "after": true }, "body": "", "bodyLine": 10 }
+    },
+    {
+      "description": "a leading BOM and CRLF line endings",
+      "input": "\ufeff---\r\ntitle: Notes\r\ntags: [a]\r\n---\r\nBody line\r\n",
+      "expected": { "frontmatter": { "title": "Notes", "tags": ["a"] }, "body": "Body line\n", "bodyLine": 5 }
+    },
+    {
+      "description": "the body keeps later fences",
+      "input": "---\na: 1\n---\ntext\n---\nmore\n",
+      "expected": { "frontmatter": { "a": 1 }, "body": "text\n---\nmore\n", "bodyLine": 4 }
+    },
+    {
+      "description": "a key named __proto__ is an ordinary key",
+      "input": "---\n__proto__: x\n---\n",
+      "expected": { "frontmatter": { "__proto__": "x" }, "body": "", "bodyLine": 4 }
+    }
+  ]
+}

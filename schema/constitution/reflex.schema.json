@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "reflex file frontmatter",
+  "description": "Frontmatter of reflexes/<slug>.md. scope is behavioral, architectural or tool:<host>; summary is the one line the reflex index carries. occasion, falsified-when (the falsification trigger) and revise (the revision step) are checked by the curation rules rather than required here, so their absence is reported as a finding naming the rule. x-proposal-required lists what a file under proposals/reflexes/ must carry instead of required.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scope", "summary", "adopted", "adopted-hash"],
+  "x-proposal-required": ["scope", "summary", "proposed"],
+  "properties": {
+    "scope": { "type": "string", "pattern": "^(behavioral|architectural|tool:(hermes|omp))$" },
+    "summary": { "type": "string", "minLength": 1, "pattern": "^[^\\n]+$" },
+    "falsified-when": { "type": "string" },
+    "revise": { "type": "string" },
+    "occasion": { "type": "string" },
+    "proposed": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "adopted": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "adopted-hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "description": "House-level files lampstand init plants at the root of a house. Each entry copies template to destination, only when the destination is missing. The dotfiles are stored without their leading dot and with a .txt suffix: a .gitignore or .gitattributes here would apply to this repository's own tree, npm leaves a packaged .gitignore out, and Hermes's install scanner reads a .txt file but skips a name with no extension.",
+  "files": [
+    { "template": "AGENTS.md", "destination": "AGENTS.md" },
+    { "template": "gitattributes.txt", "destination": ".gitattributes" },
+    { "template": "gitignore.txt", "destination": ".gitignore" }
+  ]
+}

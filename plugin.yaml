@@ -1,0 +1,14 @@
+manifest_version: 2
+name: lampstand
+version: 0.1.0
+description: "Plants a house: a git repository you own that holds your agent's principles, rules, tasks, decisions and knowledge as plain files."
+author: vincitamore
+license: MIT
+kind: standalone
+# First Hermes release whose install scan rates this plugin safe; 0.22.3 first reported the session's cwd and surface.
+requires_hermes: ">=0.22.6"
+provides_tools:
+  - lampstand_delegate
+provides_hooks:
+  - pre_llm_call
+  - pre_verify
