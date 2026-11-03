@@ -1,12 +1,14 @@
 {
-  "description": "The input hash in every projection header. The header names the inputs as house.toml, principles/*.md, charter/core.md, charter/provisions/*.md, reflexes/*.md, voice.md. A spec ending in /*.md is every regular *.md file directly in that directory, in code point order of its name; other specs are single files. Absent files are skipped. The hash is sha256 over the UTF-8 of, for each present file in spec order, <house-relative path with / separators>\\n<content-hash>\\n, where content-hash is sha256 hex of the file's text after dropping a leading BOM and turning CRLF into LF (schema/conformance/hash). Each vector plants files (house-relative path to text) in an empty directory; input-paths and input-hash are what a reader must compute.",
+  "description": "The input hash in every projection header. The header names the inputs as house.toml, principles/*.md, charter/core.md, charter/provisions/*.md, reflexes/*.md, voice.md. A spec ending in /*.md is every regular *.md file directly in that directory, in code point order of its name; other specs are single files. Absent files are skipped. The hash is sha256 over the UTF-8 of, for each present file in spec order, <house-relative path with / separators>\\n<content-hash>\\n, where content-hash is sha256 hex of the file's text after dropping a leading BOM and turning CRLF into LF (schema/conformance/hash). One file is hashed as the compiler reads it: house.toml first loses every blank line and every line whose first non-blank character is #, and every table whose header's first key is jobs, modules or gate (a header is a line whose first non-blank character is [; its first key is the text after the brackets and blanks up to the next . or ] or blank, one pair of surrounding quotes removed; the table runs to the next header line); the kept lines are joined with a newline and end with one, and a house.toml with none left hashes as the empty text. Each vector plants files (house-relative path to text) in an empty directory; input-paths and input-hash are what a reader must compute.",
   "vectors": [
     {
       "name": "house.toml alone",
       "files": {
         "house.toml": "[house]\nschema = 1\nid = \"0b9a1c2e-4f5d-4e6a-8b7c-9d0e1f2a3b4c\"\nname = \"v\"\n"
       },
-      "input-paths": ["house.toml"],
+      "input-paths": [
+        "house.toml"
+      ],
       "input-hash": "6a59c162f8c196db092b8ac1188a980d69ace6ea282bce94f7040c7778ca363f"
     },
     {
@@ -37,7 +39,10 @@
         "house.toml": "[house]\r\nschema = 1\r\nid = \"0b9a1c2e-4f5d-4e6a-8b7c-9d0e1f2a3b4c\"\r\nname = \"v\"\r\n",
         "voice.md": "\ufeff# Voice\r\n"
       },
-      "input-paths": ["house.toml", "voice.md"],
+      "input-paths": [
+        "house.toml",
+        "voice.md"
+      ],
       "input-hash": "a76ee5a673b5493ef21f0b1da6acb65df01828cb76083caad8371871e4e686d8"
     },
     {
@@ -46,7 +51,10 @@
         "house.toml": "[house]\nschema = 1\nid = \"0b9a1c2e-4f5d-4e6a-8b7c-9d0e1f2a3b4c\"\nname = \"v\"\n",
         "voice.md": "# Voice\n"
       },
-      "input-paths": ["house.toml", "voice.md"],
+      "input-paths": [
+        "house.toml",
+        "voice.md"
+      ],
       "input-hash": "a76ee5a673b5493ef21f0b1da6acb65df01828cb76083caad8371871e4e686d8"
     },
     {
@@ -60,8 +68,54 @@
         "principles/notes.txt": "not an input\n",
         "principles/nested/c.md": "not an input\n"
       },
-      "input-paths": ["house.toml", "principles/B.md", "principles/a.md", "principles/\uff01.md", "principles/\ud83d\ude00.md"],
+      "input-paths": [
+        "house.toml",
+        "principles/B.md",
+        "principles/a.md",
+        "principles/\uff01.md",
+        "principles/\ud83d\ude00.md"
+      ],
       "input-hash": "8ec421718aa637060ef5dd72d6ff55758f3c18d557c01cd4aee83c0293cbe8c2"
+    },
+    {
+      "name": "house.toml with purpose, charter and a comment",
+      "files": {
+        "house.toml": "[house]\nschema = 1\nid = \"0b9a1c2e-4f5d-4e6a-8b7c-9d0e1f2a3b4c\"\nname = \"v\"\n\n# What the house is for.\n[purpose]\ntext = \"Serve the clinic.\"\n\n[charter]\nmode = \"rules\"\nask_first = [\"Ask before pushing.\"]\n"
+      },
+      "input-paths": [
+        "house.toml"
+      ],
+      "input-hash": "7d0f95540d1a0bd6b1d7d05d41365adb95860fb582fc790ce338e43bbe315e89"
+    },
+    {
+      "name": "declaring [modules], [gate] and [jobs.*] tables, with comments, leaves the hash unchanged",
+      "files": {
+        "house.toml": "[house]\nschema = 1\nid = \"0b9a1c2e-4f5d-4e6a-8b7c-9d0e1f2a3b4c\"\nname = \"v\"\n\n# What the house is for.\n[purpose]\ntext = \"Serve the clinic.\"\n\n[charter]\nmode = \"rules\"\nask_first = [\"Ask before pushing.\"]\n\n# Nightly work.\n[modules]\nscheduler = true\nrooms = false\n\n[gate]\nmode = \"remind\"\n\n# a job\n[jobs.check]\nargv = [\"lampstand\", \"doctor\",\n  \"--quick\"]\nevery = \"1h\"\n\n[jobs.\"bench-check\"]\nargv = [\"true\"]\nat = \"02:00\"\n"
+      },
+      "input-paths": [
+        "house.toml"
+      ],
+      "input-hash": "7d0f95540d1a0bd6b1d7d05d41365adb95860fb582fc790ce338e43bbe315e89"
+    },
+    {
+      "name": "changing the purpose changes the hash",
+      "files": {
+        "house.toml": "[house]\nschema = 1\nid = \"0b9a1c2e-4f5d-4e6a-8b7c-9d0e1f2a3b4c\"\nname = \"v\"\n\n# What the house is for.\n[purpose]\ntext = \"Serve the clinic well.\"\n\n[charter]\nmode = \"rules\"\nask_first = [\"Ask before pushing.\"]\n"
+      },
+      "input-paths": [
+        "house.toml"
+      ],
+      "input-hash": "3f23c5cc697bad9abc37239dd6a37d64739aded3c52811643b122ba9ad00dd27"
+    },
+    {
+      "name": "changing an ask_first line changes the hash",
+      "files": {
+        "house.toml": "[house]\nschema = 1\nid = \"0b9a1c2e-4f5d-4e6a-8b7c-9d0e1f2a3b4c\"\nname = \"v\"\n\n# What the house is for.\n[purpose]\ntext = \"Serve the clinic.\"\n\n[charter]\nmode = \"rules\"\nask_first = [\"Ask before deleting.\"]\n"
+      },
+      "input-paths": [
+        "house.toml"
+      ],
+      "input-hash": "0e9f36318b7fa478806ec6158aa03e9764366929556cb697023bc42b356b0e23"
     }
   ]
 }

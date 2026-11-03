@@ -11,7 +11,7 @@ import { parseFrontmatter } from "../frontmatter.js";
 import { atomicWrite, errorMessage, readText } from "../io.js";
 import { moveAndRelink } from "./links.js";
 import { editFrontmatter, isDate, maskCode, renderItem, slugify, utcDate } from "./markdown.js";
-import { fieldName, isTerminal, placeFor } from "./schema.js";
+import { fieldName, isTerminal, placeFor, UNLANDED_STATUSES } from "./schema.js";
 
 /** @typedef {import("./schema.js").Kind} Kind */
 /** @typedef {import("./schema.js").Field} Field */
@@ -156,23 +156,57 @@ export function stemOfItem(item) {
   return item.rel.slice(item.rel.lastIndexOf("/") + 1, -3);
 }
 
+/** Edit distance between two short strings. @param {string} a @param {string} b */
+function distance(a, b) {
+  let row = Array.from({ length: b.length + 1 }, (_, k) => k);
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j++) next[j] = Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    row = next;
+  }
+  return row[b.length];
+}
+
 /**
- * The one item of `kinds` that `ref` names: a file stem, a file name, or a house-relative path.
+ * The one item of `items` that `ref` names: a file stem, a file name or a house-relative path; failing that, a title
+ * (case-insensitive, whitespace-collapsed) or text that slugifies to a stem. A ref that names nothing gets the closest
+ * stems in the message; one that names several lists them.
  * @param {ItemFile[]} items
  * @param {string} ref
  * @param {string} what  how the caller names the kinds, for messages
+ * @param {OrgSchema} schema  reads each item's title
  */
-export function findItem(items, ref, what) {
+export function findItem(items, ref, what, schema) {
   const wanted = ref.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\.md$/i, "").toLowerCase();
-  const matches = items.filter((item) => {
+  const exact = items.filter((item) => {
     const rel = item.rel.slice(0, -3).toLowerCase();
     return wanted.includes("/") ? rel === wanted : stemOfItem(item).toLowerCase() === wanted;
   });
-  if (matches.length === 0) throw fail("E_USAGE", `no ${what} named ${JSON.stringify(ref)}`);
-  if (matches.length > 1) {
-    throw fail("E_USAGE", `${JSON.stringify(ref)} names more than one ${what}: ${matches.map((item) => item.rel).join(", ")}; give the path`);
+  if (exact.length > 1) {
+    throw fail("E_USAGE", `${JSON.stringify(ref)} names more than one ${what}: ${exact.map((item) => item.rel).join(", ")}; give the path`);
   }
-  return matches[0];
+  if (exact.length === 1) return exact[0];
+
+  const title = ref.trim().replace(/\s+/g, " ").toLowerCase();
+  const slug = slugify(ref);
+  const named = items.filter((item) => {
+    const own = titleOf(item, schema);
+    return (own !== undefined && own.trim().replace(/\s+/g, " ").toLowerCase() === title) || (slug !== "" && stemOfItem(item).toLowerCase() === slug);
+  });
+  if (named.length === 1) return named[0];
+  if (named.length > 1) {
+    throw fail("E_USAGE", `${JSON.stringify(ref)} names more than one ${what}: ${named.map((item) => item.rel).join(", ")}; give the path`);
+  }
+  const target = slug === "" ? wanted : slug;
+  const limit = Math.max(3, Math.ceil(target.length * 0.4));
+  const close = [...new Set(items.map(stemOfItem))]
+    .map((stem) => ({ stem, score: distance(target, stem.toLowerCase()) }))
+    .filter(({ score }) => score <= limit)
+    .sort((a, b) => a.score - b.score || (a.stem < b.stem ? -1 : 1))
+    .slice(0, 3)
+    .map(({ stem }) => stem);
+  const hint = close.length === 0 ? "" : `; did you mean ${close.join(", ")}?`;
+  throw fail("E_USAGE", `no ${what} named ${JSON.stringify(ref)}${hint}`);
 }
 
 /**
@@ -225,16 +259,22 @@ export function createItem(root, schema, kind, input) {
 }
 
 /**
- * Checks a resolution: one line naming where the work landed, by a [[wikilink]] or a URL.
+ * Checks a resolution: one line. For a status that means the work landed it names where, by a [[wikilink]] or a URL;
+ * for one that means it landed nowhere (dropped, withdrawn, abandoned) it is a plain reason.
  * @param {string | undefined} resolution
+ * @param {string} status  the terminal status being set
  */
-export function checkResolution(resolution) {
+export function checkResolution(resolution, status) {
+  const unlanded = UNLANDED_STATUSES.includes(status);
   if (resolution === undefined || resolution.trim() === "") {
-    throw fail("E_USAGE", "a terminal status needs --resolution \"<one line>\" naming where the work landed ([[link]] or URL)");
+    throw fail(
+      "E_USAGE",
+      unlanded ? `${status} needs --resolution "<one line reason>"` : `a terminal status needs --resolution "<one line>" naming where the work landed ([[link]] or URL)`,
+    );
   }
   if (/[\r\n]/.test(resolution)) throw fail("E_USAGE", "--resolution is one line");
-  if (!/\[\[[^\[\]\n]+\]\]|\bhttps?:\/\/\S+/.test(resolution)) {
-    throw fail("E_USAGE", "--resolution must name where the work landed with a [[wikilink]] or a URL");
+  if (!unlanded && !/\[\[[^\[\]\n]+\]\]|\bhttps?:\/\/\S+/.test(resolution)) {
+    throw fail("E_USAGE", `--resolution must name where the work landed with a [[wikilink]] or a URL (only ${UNLANDED_STATUSES.join(", ")} take a plain reason)`);
   }
   return resolution.trim();
 }
@@ -278,7 +318,7 @@ export function transition(root, schema, item, change) {
     const wasTerminal = before !== undefined && isTerminal(kind, before) && item.place === placeFor(schema, kind, item.folder, before);
     if (change.resolution !== undefined || !wasTerminal) {
       edits[resolvedKey] = utcDate(change.now);
-      if (change.resolution !== undefined || kind.resolutionRequired) edits[resolutionKey] = checkResolution(change.resolution);
+      if (change.resolution !== undefined || kind.resolutionRequired) edits[resolutionKey] = checkResolution(change.resolution, status);
     }
   } else {
     if (change.resolution !== undefined) throw fail("E_USAGE", `--resolution applies only to a terminal status (${kind.terminal.join(", ")})`);

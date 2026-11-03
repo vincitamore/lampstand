@@ -64,13 +64,18 @@ export function withProjection(context, projectionText) {
   return context === "" ? projectionText : `${context.endsWith("\n") ? context : `${context}\n`}\n${projectionText}`;
 }
 
-/** @param {House} house */
+/**
+ * The kernel: the purpose, one line per principle (its `*Kernel:*` line when it has one, else its thesis and failure
+ * mode), and the ask-first lines.
+ * @param {House} house
+ */
 export function renderKernel(house) {
   const parts = [];
   if (house.purpose.text !== "") parts.push(`Purpose: ${house.purpose.text}`);
   const principles = house.principleFiles.flatMap((file) => file.principles);
   if (principles.length > 0) {
     const lines = principles.map((p) => {
+      if (p.kernel !== null) return `- ${p.mark} ${p.name}: ${p.kernel}`;
       const failure = p.failureMode ? ` Failure mode: ${withStop(p.failureMode.summary)}` : "";
       return `- ${p.mark} ${p.name}: ${p.thesis}${failure}`;
     });
@@ -85,9 +90,28 @@ function withStop(text) {
   return /[.!?]$/.test(text) ? text : `${text}.`;
 }
 
+/**
+ * A principle file's text without its `*Kernel:*` paragraphs: the kernel already carries that line in every session,
+ * so the detail beside it would only repeat it.
+ * @param {string} body
+ */
+export function withoutKernelLines(body) {
+  const out = [];
+  const lines = body.split("\n");
+  for (let k = 0; k < lines.length; k++) {
+    if (!/^\*Kernel:\*/.test(lines[k])) {
+      out.push(lines[k]);
+      continue;
+    }
+    while (k + 1 < lines.length && lines[k + 1].trim() !== "") k++;
+    if (k + 1 < lines.length) k++; // the blank line that ended the paragraph
+  }
+  return out.join("\n");
+}
+
 /** @param {House} house */
 function principleDetail(house) {
-  return house.principleFiles.map((file) => file.body).join("\n\n");
+  return house.principleFiles.map((file) => withoutKernelLines(file.body)).join("\n\n");
 }
 
 /** @param {House} house */

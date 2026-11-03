@@ -37,7 +37,8 @@ Write it with `lampstand propose reflex <file> --occasion "<the failure that tau
 
 A principle is safe to load as an unconditional lens only if applying it everywhere cannot cut a safety margin or
 abandon an honest path. Each carries a failure mode (how it goes wrong by excess); a candidate without one is not
-ready. A provision states its occasion, its reason and which principle it comes from.
+ready. A provision states its occasion, its reason and which principle it comes from. Give a principle a one-line
+`*Kernel:*` paragraph too: the kernel is nearly full, and without it the kernel carries the thesis and failure mode.
 
 ## Revision and retirement
 

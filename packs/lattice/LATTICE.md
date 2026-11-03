@@ -20,6 +20,8 @@
 
 *The complex/infinite/powerful sits at the simple/origin/humble point. Find the frame that shows it — relocate, do not reduce.*
 
+*Kernel:* Relocate, do not reduce: find the frame where the great sits at the humble point, and keep the load it must bear.
+
 - **mathematical**: the point at infinity is the origin of the inverted chart — inversion is geometry's literal symmetry, not a metaphor borrowed from it.
 - **theological**: the infinite is located, not diminished, at the humble pole — kenōsis names the mode of fullness, never its subtraction.
 - **linguistic**: the most expanded content arrives by the most compressed medium — ornament confesses the smallness of what it adorns.
@@ -33,6 +35,8 @@
 ### 1→7 : Single-Source Multiplicity
 
 *One source radiates into structured plurality without partition; the whole is present in each manifestation, and the manifold is anchored to the literal.*
+
+*Kernel:* One source, many faithful manifestations anchored to the literal; when they contradict, the reading is wrong.
 
 - **theological**: an undivided source radiates without being depleted — what manifests is the whole standing forth under one face, not a portion sent out.
 - **mathematical**: by Yoneda, an object is the totality of its morphisms — there is no thing-in-itself behind the manifestations; identity is the network of relations.
@@ -48,6 +52,8 @@
 
 *Some knowing is constituted by relation, not transferred by report; the relation is part of what is known.*
 
+*Kernel:* Some knowing is constituted by relation: do not broadcast what is addressed, or withhold what can be told.
+
 - **epistemological**: to know-about is one operation and to know-with is another; the second is not the first thoroughed, and no quantity of broadcast asymptotes to indwelling.
 - **ontological**: for certain objects — persons, crafts, complex living systems, sacra — the knowing-relation is partly what they are; abstract the relation and what remains resembles the thing without being it.
 - **tacit**: we know more than we can tell; the articulable rides on a substrate that does not survive being made focal, and forcing the articulation past its joint falsifies rather than reveals.
@@ -61,6 +67,8 @@
 ### Σ→1 : Irreducible Form
 
 *Seek the axiom from which the structure unfolds. Compress to the generative minimum.*
+
+*Kernel:* Seek the generative minimum; a compression that cannot regenerate the structure has not found it.
 
 - **mathematical**: the right axiom-set is jointly sufficient and severally necessary; compression has a provable floor.
 - **linguistic**: every change to a text is addition, omission, transposition, or substitution — the four operations are closed.
@@ -76,6 +84,8 @@
 
 *A system is sovereign when it carries its own runtime, identity, state, and meaning, and defers only to warrant it can inspect. It receives what constitutes it without subordination, and knows the creaturely limit of self-warrant.*
 
+*Kernel:* Carry your own runtime, state and meaning; defer only to warrant you can inspect, and know where self-warrant ends.
+
 - **operational**: a system that requires an external service for its essential operations is sovereign at that service's discretion, not its own.
 - **cryptographic**: a name granted by a registrar can be revoked by a registrar; a name that is a key cannot.
 - **data**: information you cannot hold locally is information you cannot keep; storage you cannot copy is storage you do not own.
@@ -89,6 +99,8 @@
 ### ≡ : Structural Correctness Over Functional Adequacy
 
 *A structure is right with respect to the operations it must support over time — not the sample exercised at the moment of judgment. Functional adequacy verifies the sample; structural correctness verifies the space, and without a named operation-space the claim is vanity.*
+
+*Kernel:* Be right over the operations the structure must support over time, not the sample tested; name that space.
 
 - **algebraic**: a structure is correct when its axioms close under every operation the system must support — not under the sample tested.
 - **physical**: the symmetries you keep are the invariants you preserve; structure that respects the symmetry generates the conservation law for free.
@@ -104,6 +116,8 @@
 
 *Whatever the right observer must act on should be visible to them in time to act. The boundary of what is exposed, the cost of exposing it, and the watching of the watchers are design questions, not afterthoughts.*
 
+*Kernel:* Show the right observer what they must act on, in time to act; price the noise, and watch the watchers.
+
 - **engineering**: un-instrumented state is structurally unreliable — what cannot be queried may not be relied upon.
 - **temporal**: observation that arrives after the decision is forensics, not governance; in-the-loop visibility is the kind that steers.
 - **epistemic**: belief is licensed by exhibit, not by the holder's confidence — warrant transfers through inspectable substrate, never through certainty (the supply side of warrant; cf. ⊢, its demand-side dual — one economy: systems must expose the exhibit, agents may credit only the exhibited).
@@ -117,6 +131,8 @@
 ### ⊢ : Logical Coherence
 
 *The firewall on assent — credit no source of belief but truth, and only what the evidence exhibits.*
+
+*Kernel:* Credit only what the evidence exhibits; state dissent before consensus closes, and reverse when evidence shifts.
 
 - **cognitive**: a bias unnamed is the bias that binds; nomenclature is the first act of refusal.
 - **temporal**: past investment is never warrant for future commitment; the question is always forward-looking.
@@ -132,6 +148,8 @@
 
 *When a re-used instrument resists, strengthen the tool — the iron is for what it guards, and the forge is credited only where its compounding exhibits.*
 
+*Kernel:* Strengthen a re-used tool where it resists; credit the forging only where its compounding shows on the work.
+
 - **operational**: an instrument used twice earns the time spent sharpening it once.
 - **diagnostic**: where the tool resists is where it asks to grow.
 - **pastoral**: the rod is iron because what it guards is precious (Ps 2:9 LXX *poimaneîs*: shepherd them with an iron rod — the translator read רעה *shepherd* where the consonants also allow רעע *break*; the verb is pastoral, and the iron is subordinate to the verb).
@@ -145,6 +163,8 @@
 ### ☉ : Septem Artes Liberales — The Seven Liberal Arts
 
 *Judge a system against both families of art — the arts of sign and the arts of measure — and keep each art in its province. A complete intellectual architecture is bipartite, neither family reducible to the other; the bipartition is constitutive, the count three-plus-four inherited.*
+
+*Kernel:* Judge work by the arts of sign (grammar, logic, rhetoric) and of measure; keep each art in its own province.
 
 > The medieval transmission chain is canonical: Martianus Capella (early 5th c., *De nuptiis Philologiae et Mercurii*) fixed the seven as a set; Boethius (c. 500, *De institutione arithmetica*) named the four arts of measure the *quadrivium*; Cassiodorus (c. 560, *Institutiones divinarum et saecularium litterarum*) mapped the seven arts for the Latin West; Hugh of St. Victor (12th c., *Didascalicon*) refined them; Bonaventure (13th c., *De Reductione Artium ad Theologiam*) unified them. ☉'s form is bipartite *because ☉'s content claims architecture itself is bipartite*; the format is content, not editorial.
 
@@ -174,6 +194,8 @@
 
 *Across bearer-discontinuity — generations, tenures, scribes, polities — continuity inheres in structure that outlasts its bearers; the successor inhabits the inherited structure, maintains its joints against drift, and verifies its frame.*
 
+*Kernel:* Continuity lives in structure that outlasts its bearers: inhabit it, keep its joints from drifting, verify its frame.
+
 - **liturgical**: the rite carries the faith across generations who never heard the founders; inheritance is performed before it is understood.
 - **institutional**: the office outlives the officeholder; the rule sustains continuity through total personnel change because the rule is written, not remembered.
 - **linguistic**: a living language is the longest inheritance any community possesses; its grammar transmits inherited patterns across speakers who never met.
@@ -188,6 +210,8 @@
 
 *The container is constitutively prior to the corpus, not merely first to it in time. Commit the frame at the granularity where retrofit cost would dominate; premature containment distorts, refused containment retrofits, both misread the same curve.*
 
+*Kernel:* Commit the frame where retrofit would cost most; neither force the corpus early nor refuse a frame until too late.
+
 - **structural**: an organized corpus presupposes a container, whether the container was named first or last.
 - **economic**: retrofit cost grows with corpus size; container cost does not; the asymmetry compounds.
 - **generative**: a container does not catalog what exists — it determines what can come to exist within it.
@@ -201,6 +225,8 @@
 ### ◇ : Primitives Over Opinions
 
 *Expose primitives, not pre-composed structures; defer composition to the consumer. When composition converges, ship the default on top of the primitives — never as them.*
+
+*Kernel:* Expose primitives and let the consumer compose; ship defaults on top of the primitives, never as them.
 
 - **mathematical**: an honest basis spans its space without secretly preferring a direction.
 - **linguistic**: the alphabet precedes the genre — do not call a genre an alphabet.

@@ -1,13 +1,15 @@
 // @ts-check
 // Planting a house: house.toml from the answers, every template manifest's files, the lattice unless declined,
 // the house's folders and planted.json, all only where missing; then `git init` when the folder is not inside a
-// repository, the compile, the AGENTS.md region and, with --default, default_house in per-user config. A re-run
-// changes no byte: every write is conditional on a missing file or a differing content.
+// repository, the compile, the AGENTS.md region, one commit of exactly the paths written and, with --default,
+// default_house in per-user config. A re-run changes no byte: every write is conditional on a missing file or a
+// differing content.
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readdirSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { hasHouseToml, loadHouseConfig, parseHouseToml } from "../config.js";
+import { commitOnly } from "../commit.js";
 import { readText } from "../io.js";
 import { runCompile } from "../constitution/run.js";
 import { byCodePoint } from "../constitution/house.js";
@@ -18,6 +20,7 @@ import {
   houseTomlText,
   latticeFile,
   PACKAGE_ROOT,
+  PLANTED_FILE,
   plantFile,
   readPlanted,
   templateFiles,
@@ -37,6 +40,7 @@ import { AGENTS_FILE, writeAgentsRegion } from "./region.js";
  *   removed: string[],
  *   plantedJson: boolean,
  *   git: "initialized" | "existing" | "unavailable",
+ *   commit: import("../commit.js").CommitOutcome | null,
  *   compile: { ok: boolean, written: string[], findings: Finding[] },
  *   region: "written" | "unchanged" | "no-file" | "no-region" | "not-compiled",
  *   defaultHouse: { path: string, changed: boolean } | null,
@@ -75,6 +79,9 @@ function starterJobs() {
     .sort(byCodePoint)
     .map((name) => ({ id: name.slice(0, -".toml".length), toml: readText(join(dir, name)) }));
 }
+
+/** The message of the commit that holds what init planted. */
+export const PLANT_MESSAGE = "Plant the house";
 
 /**
  * Plants a house in `dir`.
@@ -125,6 +132,9 @@ export function initHouse(options) {
   const compiled = run.errors.length === 0;
   // The compile refreshes the region itself; asking the writer again only reports the state (no file, no markers).
   const region = !compiled ? "not-compiled" : run.written.includes(AGENTS_FILE) ? "written" : writeAgentsRegion(root, run.compiled).status;
+  // Only what this run wrote is committed: planted files, planted.json, the compiled projections and the region.
+  const written = [...outcome.planted, ...(plantedJson ? [PLANTED_FILE] : []), ...run.written, ...(region === "written" ? [AGENTS_FILE] : [])];
+  const commit = git === "unavailable" ? null : commitOnly(root, written, PLANT_MESSAGE, options.env);
   const defaultHouse = options.makeDefault ? setDefaultHouse(options.env, root) : null;
 
   return {
@@ -132,6 +142,7 @@ export function initHouse(options) {
     ...outcome,
     plantedJson,
     git,
+    commit,
     compile: { ok: compiled, written: run.written, findings: run.findings },
     region,
     defaultHouse,

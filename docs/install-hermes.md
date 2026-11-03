@@ -4,7 +4,7 @@ lampstand needs Hermes 0.22.6 or newer, Node 22.13 or newer and git.
 
 ```sh
 hermes plugins install vincitamore/lampstand
-npm install -g "github:vincitamore/lampstand#v0.1.0"
+npm install -g "github:vincitamore/lampstand#v0.2.0"
 ```
 
 Hermes scans the plugin, then asks two questions:
@@ -30,7 +30,8 @@ hermes
 ## Upgrading
 
 `hermes plugins update lampstand` brings the plugin to the latest release; your house is untouched. Then run
-`lampstand upgrade` in the house to migrate it.
+`lampstand upgrade` in the house to migrate it; it commits exactly what it changed, as
+`Upgrade the house to lampstand <version>`.
 
 ## What the plugin does in a session
 
@@ -42,3 +43,9 @@ hermes
 
 Messaging surfaces and scheduled jobs have no working folder, so they use the house recorded with
 `lampstand init --default`, and nothing else.
+
+## Windows
+
+On Windows the CLI is the `lampstand.cmd` shim, and Node and Bun refuse some characters (quotes, parentheses, `%`) in
+a batch file's arguments: a long `--body "..."` can fail with `batch file arguments are invalid`. Pass the text on
+stdin instead: `--body -`, or `lampstand capture -`.

@@ -1,7 +1,7 @@
 # Curation
 
 The agent admits reflexes under these rules; `lampstand compile` checks every one of them and refuses a house that
-breaks one.
+breaks one. Principles and provisions are adopted only by the operator: the CLI refuses them from an agent's shell.
 
 - Every new principle, provision or reflex carries an occasion: what happened that calls for it.
 - Every principle carries a failure mode.

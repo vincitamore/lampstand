@@ -1,14 +1,16 @@
 // @ts-check
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { hasHouseToml } from "../config.js";
 import { fail } from "../errors.js";
 import { WORKSPACE_FLAGS, resolveHouse } from "../root.js";
 import { today } from "../constitution/curate.js";
 import { answersFrom, askAnswers, kernelFit, kernelFitText, readAnswersFile } from "./answers.js";
-import { initHouse } from "./init.js";
+import { commitLine } from "../commit.js";
+import { initHouse, PLANT_MESSAGE } from "./init.js";
+import { PACKAGE_ROOT } from "./plant.js";
 import { regionProblem } from "./region.js";
-import { upgradeHouse } from "./upgrade.js";
+import { upgradeHouse, upgradeMessage } from "./upgrade.js";
 
 /** @typedef {import("../cli.js").Verb} Verb */
 /** @typedef {import("../constitution/rules.js").Finding} Finding */
@@ -43,10 +45,14 @@ function compileLines(result) {
 
 /**
  * The terminal conversation: explanations and prompts on stderr, so --json keeps stdout to its one object. Lines
- * are queued as they arrive, so answers pasted several at once are each kept for the question they answer.
+ * are queued as they arrive, so answers pasted several at once are each kept for the question they answer. An
+ * answer the terminal did not echo next to its prompt (one that was queued, or any answer without a terminal) ends
+ * the prompt's line, so the next explanation never starts in the middle of it.
+ * @param {NodeJS.ReadableStream} [input]
+ * @param {NodeJS.WritableStream} [output]
  */
-function terminal() {
-  const rl = createInterface({ input: process.stdin, output: process.stderr });
+export function terminal(input = process.stdin, output = process.stderr) {
+  const rl = createInterface({ input, output });
   /** @type {string[]} */
   const lines = [];
   /** @type {((line: string | null) => void) | null} */
@@ -68,7 +74,7 @@ function terminal() {
   return {
     /** @param {string} text */
     show(text) {
-      process.stderr.write(`${text}\n`);
+      output.write(`${text}\n`);
     },
     /** @param {string} question @returns {Promise<string>} */
     async ask(question) {
@@ -77,6 +83,7 @@ function terminal() {
       const queued = lines.shift();
       const line = queued !== undefined ? queued : ended ? null : await new Promise((resolve) => (waiting = resolve));
       if (line === null) throw fail("E_USAGE", "the input ended before every question was answered; nothing was planted");
+      if (!rl.terminal || queued !== undefined) output.write("\n");
       return line;
     },
     close() {
@@ -88,7 +95,7 @@ function terminal() {
 /** @type {Verb} */
 export const initVerb = {
   name: "init",
-  summary: "plant a house: the six Plant questions (or --answers), missing files only, git init, compile",
+  summary: "plant a house: the six Plant questions (or --answers), missing files only, git init, compile, commit what was planted",
   args: { min: 0, max: 1, usage: "[<dir>]" },
   flags: {
     answers: { type: "string", summary: "a TOML file holding the answers, for planting without a terminal" },
@@ -149,8 +156,15 @@ export const initVerb = {
     });
 
     const compile = compileLines(result);
+    // A repository init just created holds nothing but the plant, so the by-hand command can be the short one.
+    const commit =
+      result.commit !== null && result.commit.status === "uncommitted" && result.commit.command !== null && result.git === "initialized"
+        ? { ...result.commit, command: `git add -A && git commit -m "${PLANT_MESSAGE}"` }
+        : result.commit;
     const git =
-      result.git === "initialized" ? "git: initialized a repository (nothing committed)" : result.git === "existing" ? "git: already a repository" : "git: unavailable, so no repository was initialized; install git and run git init here";
+      result.git === "unavailable"
+        ? "git: unavailable, so no repository was initialized; install git and run git init here"
+        : `git: ${result.git === "initialized" ? "initialized a repository" : "already a repository"}; ${commit === null ? "" : commitLine(commit, PLANT_MESSAGE).slice("git: ".length)}`;
     const lines = [
       `${standing ? "house" : "planted a house"} at ${result.root}`,
       ...listing("planted", result.planted),
@@ -159,7 +173,7 @@ export const initVerb = {
       git,
       ...compile.lines,
       ...(result.defaultHouse === null ? [] : [result.defaultHouse.changed ? `default_house set in ${result.defaultHouse.path} (seat ledger records the earlier value)` : `default_house already names this house`]),
-      `starter jobs proposed, not declared (add one to house.toml [jobs] to use it): ${result.proposedJobs.map((job) => job.id).join(", ")}`,
+      `starter jobs proposed, not declared: ${result.proposedJobs.map((job) => job.id).join(", ")}; copy one from ${join(PACKAGE_ROOT, "templates", "jobs")} into house.toml (lampstand run --help shows the shape)`,
     ];
     const actionable = compile.actionable || result.git === "unavailable";
     return {
@@ -172,6 +186,8 @@ export const initVerb = {
         removed: result.removed,
         plantedJson: result.plantedJson,
         git: result.git,
+        commit: commit?.status === "committed" ? commit.sha : null,
+        uncommitted: commit?.status === "uncommitted" ? { reason: commit.reason, command: commit.command } : null,
         compile: result.compile,
         region: result.region,
         defaultHouse: result.defaultHouse,
@@ -185,7 +201,7 @@ export const initVerb = {
 /** @type {Verb} */
 export const upgradeVerb = {
   name: "upgrade",
-  summary: "migrate the house to this lampstand: back up, migrate, recompile; an edited planted file gets a proposal",
+  summary: "migrate the house to this lampstand: back up, migrate, recompile, commit what changed; an edited planted file gets a proposal",
   flags: WORKSPACE_FLAGS,
   run(context) {
     const found = resolveHouse({ env: context.env, cwd: context.cwd, workspace: !context.flags["no-workspace"] });
@@ -200,6 +216,7 @@ export const upgradeVerb = {
       ...listing("planted (new in this lampstand)", result.planted),
       ...listing("proposed (edited here, left as they are)", result.proposed),
       ...compile.lines,
+      commitLine(result.commit, upgradeMessage()),
     ];
     return {
       ok: !compile.actionable,
@@ -213,6 +230,8 @@ export const upgradeVerb = {
         proposed: result.proposed,
         compile: result.compile,
         region: result.region,
+        commit: result.commit.status === "committed" ? result.commit.sha : null,
+        uncommitted: result.commit.status === "uncommitted" ? { reason: result.commit.reason, command: result.commit.command } : null,
       },
       text: lines.join("\n"),
     };

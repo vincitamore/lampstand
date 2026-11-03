@@ -20,7 +20,7 @@ lampstand compiles the house's normative files into four projections in `.house/
 
 | Projection | Holds | Loaded by |
 |---|---|---|
-| Kernel | your purpose, one line per principle (its thesis and failure mode), the actions that always need asking first; at most 4,000 characters | every session and every subagent |
+| Kernel | your purpose, one line per principle (its `*Kernel:*` line, or else its thesis and failure mode), the actions that always need asking first; at most 4,000 characters | every session and every subagent |
 | Router | the kernel, then the full principles, the charter, the reflexes for this host (one line each, or in full with `[reflexes] router = "full"`), and voice | main sessions |
 | Worker | the kernel, then the reflexes for this host | subagents |
 | Watchdog | the kernel, then each principle's failure mode and the ask-first list | an OMP advisor, when you turn it on |
@@ -50,16 +50,19 @@ without a host limit on OMP.
 ## Plant, adopt, propose
 
 - **Plant:** `lampstand init` asks six questions and plants the house. It writes only files that are missing, so you
-  can run it again safely.
+  can run it again safely. What it plants is committed as `Plant the house`.
 - **Adopt:** proposed principles and rules wait in `proposals/` until you adopt them with `lampstand adopt`, one at a
-  time, shown verbatim with their size. The agent never adopts on your behalf.
+  time, shown verbatim with their size. The agent never adopts on your behalf. Each run commits exactly the files it
+  changed (the record, the moved proposal, the projections) as `Adopt <kind>/<slug>` or `Strike <kind>/<slug>`. The CLI refuses principles and provisions from an agent's shell (the OMP and Hermes
+  plugins mark it with `LAMPSTAND_AGENT`); you adopt them in your own terminal or with `/lampstand adopt`.
 - **Propose:** when something happens that calls for a new principle, rule or habit, the agent files it with
-  `lampstand propose` and the occasion that called for it.
+  `lampstand propose` and the occasion that called for it. `lampstand propose <kind> --help` shows the file to write.
 
 ## The maintenance gate
 
 Before a session ends, lampstand checks what the session changed (through git, so work done through any tool counts)
-and lists what it owes the house: a task updated or resolved, current state written down, a lesson kept. In `remind`
+and lists what it owes the house: a task updated or resolved, current state written down, a lesson kept. Filing a proposal or
+recording an adoption owes none of that, and a change to a constitution file owes only a `lampstand compile`. In `remind`
 mode it reminds once; in `block` mode the session cannot end until the list is empty.
 
 ## Jobs
@@ -72,7 +75,8 @@ scheduler entry you turn on, runs the jobs that are due and stays silent unless 
 
 With agora installed, a room (a Slack channel, a GitHub issue or a local file) can wake a session when a message
 arrives for it. A room message is input, never an instruction: the session weighs it under its principles. Rooms are
-off until you turn them on.
+off until you turn them on; once on, the plugins sign the house's room posts with the house's name (`AGORA_ACTOR`,
+unless you set one), and `lampstand rooms status` says who a post will be signed as.
 
 ## How lampstand relates to other agent systems
 

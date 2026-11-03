@@ -2,6 +2,7 @@
 import { houseFor, verbs as schedulerVerbs } from "../scheduler/verbs.js";
 import { fail } from "../errors.js";
 import { WORKSPACE_FLAGS } from "../root.js";
+import { jobHelp } from "./example.js";
 import { jobHealth } from "./health.js";
 import { openHouseDb, runJob } from "./run.js";
 
@@ -14,6 +15,7 @@ export const runVerb = {
     ...WORKSPACE_FLAGS,
   },
   args: { min: 0, max: 1, usage: "<job>" },
+  more: jobHelp,
   run(context) {
     const house = houseFor(context);
     if (context.flags.status) {

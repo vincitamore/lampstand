@@ -21,6 +21,8 @@ import { ERROR_CODES, LampstandError, fail, isLampstandError } from "./errors.js
  *   summary: string,
  *   flags?: Record<string, FlagSpec>,
  *   args?: { min: number, max: number, usage: string },
+ *   more?: (args: string[]) => string,
+ *   groupNote?: () => string,
  *   run: (context: VerbContext) => VerbResult | Promise<VerbResult>,
  * }} Verb
  * @typedef {{ write(text: string): unknown }} Sink
@@ -59,6 +61,26 @@ export class Registry {
     return null;
   }
 
+  /**
+   * The subcommands under a command group (`decide` holds `decide new` and `decide resolve`), with their summaries, and
+   * the group's name; null when no verb is registered under the longest leading run of `words`.
+   * @param {string[]} words
+   * @returns {{ group: string, text: string } | null}
+   */
+  group(words) {
+    for (let n = words.length; n > 0; n--) {
+      const group = words.slice(0, n).join(" ");
+      const subs = [...this.verbs.keys()].filter((name) => name.startsWith(`${group} `)).sort();
+      if (subs.length === 0) continue;
+      const width = Math.max(...subs.map((name) => name.length));
+      const lines = subs.map((name) => `  ${name.padEnd(width)}  ${/** @type {Verb} */ (this.verbs.get(name)).summary}`);
+      const notes = subs.map((name) => /** @type {Verb} */ (this.verbs.get(name)).groupNote?.()).filter((note) => note !== undefined);
+      const tail = [`lampstand ${group} <subcommand> --help shows a subcommand's flags.`, ...notes].join("\n\n");
+      return { group, text: `usage: lampstand ${group} <subcommand> [args] [--json]\n\nsubcommands:\n${lines.join("\n")}\n\n${tail}` };
+    }
+    return null;
+  }
+
   usage() {
     const names = [...this.verbs.keys()].sort();
     const width = Math.max(0, ...names.map((name) => name.length));
@@ -67,13 +89,19 @@ export class Registry {
   }
 }
 
-/** @param {Verb} verb */
-function verbUsage(verb) {
+/**
+ * @param {Verb} verb
+ * @param {string[]} [args]  the positional arguments given with --help, which `more` may use
+ * @param {Registry} [registry]  when the verb is also a command group, its subcommands are listed
+ */
+function verbUsage(verb, args = [], registry) {
   const flags = Object.entries(verb.flags ?? {}).map(
     ([name, spec]) => `  --${name}${spec.type === "string" ? " <value>" : ""}  ${spec.summary}`,
   );
   flags.push("  --json  print one JSON object whose first key is ok");
-  return `usage: lampstand ${verb.name}${verb.args ? ` ${verb.args.usage}` : ""} [flags]\n\n${verb.summary}\n\nflags:\n${flags.join("\n")}`;
+  const subs = registry?.group([verb.name]);
+  const more = `${verb.more ? `\n\n${verb.more(args)}` : ""}${subs ? `\n\n${subs.text.slice(subs.text.indexOf("subcommands:"))}` : ""}`;
+  return `usage: lampstand ${verb.name}${verb.args ? ` ${verb.args.usage}` : ""} [flags]\n\n${verb.summary}\n\nflags:\n${flags.join("\n")}${more}`;
 }
 
 /**
@@ -159,12 +187,23 @@ export async function runCli(registry, argv, io) {
         emit(io, json, { ok: true, usage: registry.usage() }, registry.usage());
         return 0;
       }
+      const group = registry.group(parsed.words);
+      if (group && parsed.help) {
+        emit(io, json, { ok: true, usage: group.text }, group.text);
+        return 0;
+      }
+      if (group) {
+        const bare = parsed.words.length === group.group.split(" ").length;
+        const why = bare ? `lampstand ${group.group} needs a subcommand` : `unknown subcommand ${JSON.stringify(parsed.words.join(" "))}`;
+        throw fail("E_USAGE", json ? why : `${why}\n\n${group.text}`);
+      }
       const reason = parsed.words.length === 0 ? "no verb given" : `unknown verb ${JSON.stringify(parsed.words.join(" "))}`;
       throw fail("E_USAGE", json ? reason : `${reason}\n\n${registry.usage()}`);
     }
     const verb = parsed.verb;
     if (parsed.help) {
-      emit(io, json, { ok: true, usage: verbUsage(verb) }, verbUsage(verb));
+      const usage = verbUsage(verb, parsed.args, registry);
+      emit(io, json, { ok: true, usage }, usage);
       return 0;
     }
     const result = await verb.run({

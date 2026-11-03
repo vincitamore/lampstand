@@ -2,9 +2,12 @@
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
+import { commitLine, commitOnly } from "../commit.js";
 import { fail } from "../errors.js";
+import { isAgentShell } from "../operator.js";
 import { WORKSPACE_FLAGS, resolveHouse } from "../root.js";
-import { adoptItem, listProposals, propose, sizeLine, strikeItem, today } from "./curate.js";
+import { actPaths, adoptItem, listProposals, propose, sizeLine, strikeItem, today } from "./curate.js";
+import { proposeHelp } from "./examples.js";
 import { KINDS } from "./parse.js";
 import { runCompile } from "./run.js";
 
@@ -12,6 +15,14 @@ import { runCompile } from "./run.js";
 /** @typedef {import("../cli.js").VerbResult} VerbResult */
 /** @typedef {import("./curate.js").ProposedItem} ProposedItem */
 /** @typedef {import("./rules.js").Finding} Finding */
+
+/** Kinds only the operator adopts; reflexes are the one kind an agent may admit. */
+const OPERATOR_KINDS = ["principle/", "provision/"];
+
+/** @param {string} id */
+function operatorOnly(id) {
+  return `${id} waits for the operator: principles and provisions are adopted by the operator, in a terminal or with /lampstand adopt`;
+}
 
 /** @param {VerbContext} context */
 function houseRoot({ env, cwd, flags }) {
@@ -122,6 +133,34 @@ export async function adoptInteractively(root, talk, date) {
   return acts;
 }
 
+/**
+ * What follows a run of adopt acts: recompile after an adoption, then commit exactly what the run wrote (the record,
+ * each moved proposal, the projections) in one commit. Nothing is committed when every item was left for later or
+ * refused.
+ * @param {string} root
+ * @param {ProposedItem[]} items  the proposals as they stood before the run
+ * @param {{ id: string, act: string }[]} acts
+ * @param {NodeJS.ProcessEnv} env
+ */
+export function settleActs(root, items, acts, env) {
+  const adopted = acts.filter((act) => act.act === "adopted");
+  const struck = acts.filter((act) => act.act === "struck");
+  // Proposals and the record are not compiler inputs, so only an adoption makes the projections stale.
+  const compiled = adopted.length > 0 ? runCompile(root) : null;
+  const byId = new Map(items.map((item) => [item.id, item]));
+  /** @type {string[]} */
+  const paths = [];
+  for (const [list, act] of /** @type {const} */ ([[adopted, "adopted"], [struck, "struck"]])) {
+    for (const { id } of list) paths.push(...actPaths(/** @type {ProposedItem} */ (byId.get(id)), act));
+  }
+  paths.push(...(compiled?.written ?? []));
+  const message = [adopted.length > 0 ? `Adopt ${adopted.map((act) => act.id).join(", ")}` : "", struck.length > 0 ? `Strike ${struck.map((act) => act.id).join(", ")}` : ""]
+    .filter((part) => part !== "")
+    .join("; ");
+  const commit = paths.length === 0 ? null : commitOnly(root, paths, message, env);
+  return { compiled, commit, message };
+}
+
 /** @param {NodeJS.ProcessEnv} env @param {import("node:readline/promises").Interface} rl @returns {Conversation} */
 function terminalConversation(env, rl) {
   return {
@@ -139,7 +178,7 @@ function terminalConversation(env, rl) {
 /** @type {import("../cli.js").Verb} */
 export const adoptVerb = {
   name: "adopt",
-  summary: "show every proposed item verbatim with its size; adopt, edit, strike or leave it for later (default later)",
+  summary: "show every proposed item verbatim with its size; adopt, edit, strike or leave it for later (default later); what is adopted or struck is committed",
   flags: {
     ...WORKSPACE_FLAGS,
     ids: { type: "string", summary: "adopt exactly these items, comma-separated <kind>/<slug>, without asking" },
@@ -148,11 +187,13 @@ export const adoptVerb = {
     const root = houseRoot(context);
     const date = today();
     const items = listProposals(root);
-    /** @type {{ id: string, act: string, refused?: string }[]} */
+    /** @type {{ id: string, act: string, refused?: string, code?: string }[]} */
     let acts = [];
     const shown = [];
     const ids = typeof context.flags.ids === "string" ? context.flags.ids.split(",").map((id) => id.trim()).filter((id) => id !== "") : null;
-    const interactive = ids === null && !context.json && process.stdin.isTTY === true && process.stdout.isTTY === true;
+    // An agent's shell never gets the interactive loop: answering it would be the agent adopting for the operator.
+    const agent = isAgentShell(context.env);
+    const interactive = ids === null && !agent && !context.json && process.stdin.isTTY === true && process.stdout.isTTY === true;
 
     if (interactive) {
       const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -168,24 +209,27 @@ export const adoptVerb = {
         const unknown = ids.filter((id) => !byId.has(id));
         if (unknown.length > 0) throw fail("E_USAGE", `no proposed item ${unknown.join(", ")}; proposed: ${items.map((item) => item.id).join(", ") || "none"}`);
         for (const id of ids) {
+          if (agent && OPERATOR_KINDS.some((prefix) => id.startsWith(prefix))) {
+            acts.push({ id, act: "refused", refused: operatorOnly(id), code: "E_OPERATOR_ONLY" });
+            continue;
+          }
           const refused = adoptItem(root, /** @type {ProposedItem} */ (byId.get(id)), date);
           acts.push(refused === null ? { id, act: "adopted" } : { id, act: "refused", refused });
         }
       }
     }
 
-    const adopted = acts.filter((act) => act.act === "adopted");
     const refusals = acts.filter((act) => act.act === "refused");
-    // Proposals and the record are not compiler inputs, so only an adoption makes the projections stale.
-    const compiled = adopted.length > 0 ? runCompile(root) : null;
+    const { compiled, commit, message } = settleActs(root, items, acts, context.env);
     const ok = refusals.length === 0 && (compiled === null || compiled.errors.length === 0);
     const lines = [...shown];
     if (items.length === 0) lines.push("no proposed items");
-    for (const act of acts) lines.push(`${act.act} ${act.id}${act.refused ? `: ${act.refused}` : ""}`);
+    for (const act of acts) lines.push(act.code === undefined ? `${act.act} ${act.id}${act.refused ? `: ${act.refused}` : ""}` : `${act.code}: ${act.refused}`);
     if (compiled) {
       lines.push(compiled.errors.length === 0 ? "compiled .house/generated/" : "compile refused: projections not updated");
       lines.push(...compiled.findings.map(findingLine));
     }
+    if (commit !== null) lines.push(commitLine(commit, message));
     return {
       ok,
       exit: ok ? 0 : 1,
@@ -194,6 +238,8 @@ export const adoptVerb = {
         proposed: items.map((item) => ({ id: item.id, path: item.path, chars: item.chars, surface: item.surface, surfaceChars: item.surfaceChars, cap: item.cap })),
         acts,
         findings: compiled?.findings ?? [],
+        commit: commit?.status === "committed" ? commit.sha : null,
+        uncommitted: commit?.status === "uncommitted" ? { reason: commit.reason, command: commit.command } : null,
       },
       text: lines.join("\n"),
     };
@@ -205,6 +251,7 @@ export const proposeVerb = {
   name: "propose",
   summary: "file a draft as a proposal: principle, provision or reflex, with the occasion that calls for it",
   args: { min: 2, max: 2, usage: "principle|provision|reflex <file>" },
+  more: proposeHelp,
   flags: {
     ...WORKSPACE_FLAGS,
     occasion: { type: "string", summary: "what happened that calls for this item (required)" },

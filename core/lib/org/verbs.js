@@ -3,6 +3,7 @@
 import { existsSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { fail } from "../errors.js";
+import { readStdin } from "../io.js";
 import { checkGate } from "../gate.js";
 import { capLines, orient } from "../orient.js";
 import { WORKSPACE_FLAGS, resolveHouse } from "../root.js";
@@ -38,6 +39,16 @@ function open(context) {
 function text(context, name) {
   const value = context.flags[name];
   return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * The text of `--body`; `-` reads it from standard input, so Markdown with backticks or quotes needs no shell quoting.
+ * @param {VerbContext} context
+ * @returns {string | undefined}
+ */
+function bodyText(context) {
+  const value = text(context, "body");
+  return value === "-" ? readStdin() : value;
 }
 
 /** @param {OrgSchema} schema @param {string} name */
@@ -130,7 +141,7 @@ function transitionData(done) {
  */
 function runTransition(context, select, what, change) {
   const { root, schema } = open(context);
-  const item = findItem(itemsOf(root, schema, select(schema)), context.args[0], what);
+  const item = findItem(itemsOf(root, schema, select(schema)), context.args[0], what, schema);
   const done = transition(root, schema, item, { status: change.status ?? text(context, "status"), resolution: text(context, "resolution"), fields: change.fields });
   return { data: transitionData(done), text: transitionText(done) };
 }
@@ -146,16 +157,16 @@ function runCreate(context, kindName, extra = {}) {
   const kind = kindNamed(schema, kindName);
   const rel = createItem(root, schema, kind, {
     title: extra.title ?? context.args[context.args.length - 1],
-    body: extra.body ?? text(context, "body"),
+    body: extra.body ?? bodyText(context),
     fields: extra.fields,
     stem: extra.stem,
   });
   return { data: { path: rel, kind: kind.name }, text: `created ${rel}` };
 }
 
-const BODY = { body: { type: /** @type {const} */ ("string"), summary: "text to put under the title" } };
+const BODY = { body: { type: /** @type {const} */ ("string"), summary: "text to put under the title, or - to read it from stdin" } };
 const RESOLUTION = {
-  resolution: { type: /** @type {const} */ ("string"), summary: "one line naming where the work landed: a [[wikilink]] or a URL" },
+  resolution: { type: /** @type {const} */ ("string"), summary: "one line naming where the work landed: a [[wikilink]] or a URL; for dropped, withdrawn or abandoned, a plain reason" },
 };
 const LIST_FLAGS = {
   all: { type: /** @type {const} */ ("boolean"), summary: "include resolved items" },
@@ -267,11 +278,11 @@ export const inboxSetVerb = {
 /** @type {Verb} */
 export const captureVerb = {
   name: "capture",
-  summary: "capture a thought into inbox/captures/ to sort later",
-  args: { min: 1, max: 1, usage: "\"<text>\"" },
+  summary: "capture a thought into inbox/captures/ to sort later; the text may be - to read it from stdin",
+  args: { min: 1, max: 1, usage: "\"<text>\" | -" },
   flags: WORKSPACE_FLAGS,
   run(context) {
-    const body = context.args[0].trim();
+    const body = (context.args[0] === "-" ? readStdin() : context.args[0]).trim();
     if (body === "") throw fail("E_USAGE", "nothing to capture");
     const first = body.split("\n", 1)[0].trim();
     const title = first.length > 80 ? `${first.slice(0, 77).trimEnd()}...` : first;
@@ -456,7 +467,7 @@ export const forgeNewVerb = {
     const root = houseRoot(context);
     const raw = text(context, "stages");
     const stages = raw === undefined ? [] : raw.split(",").map((stage) => stage.trim()).filter((stage) => stage !== "");
-    const rel = newSession(root, { title: context.args[0], stages, body: text(context, "body") });
+    const rel = newSession(root, { title: context.args[0], stages, body: bodyText(context) });
     return { data: { path: rel, stages }, text: `created ${rel}` };
   },
 };
@@ -527,7 +538,7 @@ export const gateVerb = {
     return {
       exit: result.block ? 1 : 0,
       data: { mode: result.mode, owed: result.owed, block: result.block, source: result.source },
-      text: result.owed.length === 0 ? `gate (${result.mode}): nothing owed` : `gate (${result.mode}): owed\n${lines.join("\n")}${result.block ? `\n${result.block}` : ""}`,
+      text: result.owed.length === 0 ? `gate (${result.mode}): nothing owed` : `gate (${result.mode}): owed\n${lines.join("\n")}${result.block ? "\nblock: the session cannot end until these are done" : ""}`,
     };
   },
 };

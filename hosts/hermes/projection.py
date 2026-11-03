@@ -2,7 +2,8 @@
 
 The hash is defined in schema/constitution/input-hash.json: sha256 over, for each present input in spec order,
 `<house-relative path>\\n<content hash>\\n`, where the content hash is sha256 of the file's text with one leading BOM
-removed and CRLF turned into LF (schema/conformance/hash). A stale projection is still loaded; it carries a notice.
+removed and CRLF turned into LF (schema/conformance/hash), except that house.toml is first reduced to what the compiler
+reads: blank and comment lines and the jobs, modules and gate tables are left out. A stale projection is still loaded; it carries a notice.
 """
 
 from __future__ import annotations
@@ -28,6 +29,30 @@ def content_hash(raw: bytes) -> str:
     return hashlib.sha256(text.replace("\r\n", "\n").encode("utf-8")).hexdigest()
 
 
+UNPROJECTED_TABLES = ("jobs", "modules", "gate")
+_QUOTED = re.compile(r"^([\"'])(.*)\1$")
+
+
+def hashed_text(path: str, text: str) -> str:
+    """The text of an input as the hash sees it (LF-normalized, no BOM): house.toml loses blank and comment lines and
+    every table whose header's first key is unprojected; any other file is unchanged."""
+    if path != "house.toml":
+        return text
+    skipping = False
+    kept: list[str] = []
+    for line in text.split("\n"):
+        trimmed = line.strip()
+        if trimmed == "" or trimmed.startswith("#"):
+            continue
+        if trimmed.startswith("["):
+            first = re.split(r"[.\] \t]", re.sub(r"^\[+[ \t]*", "", trimmed), maxsplit=1)[0]
+            quoted = _QUOTED.match(first)
+            skipping = (quoted.group(2) if quoted else first) in UNPROJECTED_TABLES
+        if not skipping:
+            kept.append(line)
+    return "\n".join(kept) + "\n" if kept else ""
+
+
 def input_paths(root: str, specs: list[str]) -> list[str]:
     """The house-relative inputs present for `specs`: a `<dir>/*.md` spec is every regular .md file directly in that
     directory in code point order of its name; any other spec is one file, skipped when absent."""
@@ -51,7 +76,8 @@ def input_hash(root: str, paths: list[str]) -> str:
     digest = hashlib.sha256()
     for path in paths:
         with open(os.path.join(root, *path.split("/")), "rb") as handle:
-            digest.update(f"{path}\n{content_hash(handle.read())}\n".encode())
+            text = handle.read().decode("utf-8").removeprefix("\ufeff").replace("\r\n", "\n")
+            digest.update(f"{path}\n{content_hash(hashed_text(path, text).encode('utf-8'))}\n".encode())
     return digest.hexdigest()
 
 

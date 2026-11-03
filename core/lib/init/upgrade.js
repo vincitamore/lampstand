@@ -6,8 +6,10 @@
 // A planted file whose template changed is replaced only when the operator never edited it (its hash still equals
 // planted.json's); an edited one keeps every byte and gets a proposal in proposals/updates/ instead. The lattice is
 // never replaced: an unedited copy gets the new pack text as a proposal, an edited one a note that the pack changed.
+// What the upgrade wrote is committed as one commit naming exactly those paths; the backup is outside the house.
 import { cpSync, existsSync, mkdirSync, mkdtempSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { commitOnly } from "../commit.js";
 import { fail } from "../errors.js";
 import { atomicWrite, contentHash, readText } from "../io.js";
 import { HOUSE_SCHEMA_VERSION, loadHouseConfig } from "../config.js";
@@ -20,6 +22,7 @@ import {
   LATTICE_FILE,
   LATTICE_PACK,
   latticeFile,
+  PLANTED_FILE,
   plantedHash,
   readPlanted,
   templateFiles,
@@ -53,6 +56,7 @@ export const MIGRATIONS = Object.freeze([]);
  *   planted: string[],
  *   compile: { ok: boolean, written: string[], findings: Finding[] },
  *   region: "written" | "unchanged" | "no-file" | "no-region" | "not-compiled",
+ *   commit: import("../commit.js").CommitOutcome,
  * }} UpgradeResult
  */
 
@@ -156,6 +160,11 @@ function backup(root, houseId, env, now) {
   return dir;
 }
 
+/** The message of the commit that holds what an upgrade wrote. */
+export function upgradeMessage() {
+  return `Upgrade the house to lampstand ${VERSION}`;
+}
+
 /**
  * @param {{ root: string, env: NodeJS.ProcessEnv, now: Date, date: string }} options
  * @returns {UpgradeResult}
@@ -217,16 +226,29 @@ export function upgradeHouse({ root, env, now, date }) {
   }
   const lattice = upgradeLattice(root, date);
   if (lattice !== null) out.proposed.push(lattice);
-  writePlanted(root, planted);
+  const plantedChanged = writePlanted(root, planted);
 
   const run = runCompile(root);
   const compiled = run.errors.length === 0;
+  const region = !compiled ? "not-compiled" : run.written.includes(AGENTS_FILE) ? "written" : writeAgentsRegion(root, run.compiled).status;
+  // Exactly what this run wrote: migrated, replaced and new files, the proposals, planted.json, the projections and
+  // the region. An edited file the upgrade left alone is in none of these lists, so it stays out of the commit.
+  const written = [
+    ...migrations.flatMap((migration) => migration.wrote),
+    ...out.updated,
+    ...out.planted,
+    ...out.proposed,
+    ...(plantedChanged ? [PLANTED_FILE] : []),
+    ...run.written,
+    ...(region === "written" ? [AGENTS_FILE] : []),
+  ];
   return {
     root,
     backup: saved,
     migrations,
     ...out,
     compile: { ok: compiled, written: run.written, findings: run.findings },
-    region: !compiled ? "not-compiled" : run.written.includes(AGENTS_FILE) ? "written" : writeAgentsRegion(root, run.compiled).status,
+    region,
+    commit: commitOnly(root, written, upgradeMessage(), env),
   };
 }

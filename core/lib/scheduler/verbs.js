@@ -4,6 +4,8 @@
 import { join } from "node:path";
 import { askOnce } from "../cli.js";
 import { fail } from "../errors.js";
+import { jobHelp } from "../governance/example.js";
+import { requireOperator } from "../operator.js";
 import { loadHouse } from "../governance/jobs.js";
 import { WORKSPACE_FLAGS, resolveHouse } from "../root.js";
 import { stateDirFor } from "../state/paths.js";
@@ -153,9 +155,12 @@ export function schedulerStatus({ house, host }) {
 /** @type {Verb} */
 export const schedulerEnableVerb = {
   name: "scheduler enable",
-  summary: "register this house's one OS scheduler entry (lists it and asks once)",
+  summary: "register this house's one OS scheduler entry (lists it and asks once); needs [modules] scheduler = true; the operator's act, refused from an agent's shell",
+  more: jobHelp,
+  groupNote: jobHelp,
   flags: { yes: { type: "boolean", summary: "create the listed entries without asking (for CI)" }, ...HOUSE_FLAG },
   run(context) {
+    requireOperator(context.env, "lampstand scheduler enable", "the scheduler is registered by the operator, in a terminal; an agent never registers an OS entry");
     const house = houseFor(context);
     const confirm = context.flags.yes ? () => true : askOnce;
     return enableScheduler({ house, host: hostFor(house, context.env), confirm });
@@ -168,6 +173,7 @@ export const schedulerDisableVerb = {
   summary: "remove this house's OS scheduler entry, restoring what the seat ledger recorded",
   flags: HOUSE_FLAG,
   run(context) {
+    requireOperator(context.env, "lampstand scheduler disable", "the scheduler is removed by the operator, in a terminal");
     const house = houseFor(context);
     return disableScheduler({ house, host: hostFor(house, context.env) });
   },
