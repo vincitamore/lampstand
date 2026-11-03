@@ -9,6 +9,9 @@ A house is a git repository you own, marked by a `house.toml` at its root. It ho
   reality (state).
 - **The work itself:** tasks, decisions, investigations, ideas, captures, knowledge and reminders, each a Markdown file
   with frontmatter.
+- **What the house builds:** tools, libraries and experiments, each in its own folder under `projects/`. The records
+  above stay in their own folders and link to the project; a project with its own git repository may sit there as a
+  nested repository that the house's `.gitignore` names.
 
 Everything authored lives in files, so you can read it, diff it, review it and keep it. lampstand keeps one database per
 machine (`house.db`, outside the house) only to count things: job runs and their outcomes, events, an index. Delete it

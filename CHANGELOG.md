@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.2
+
+- `lampstand init` plants `projects/README.md`, a place for what the house builds, and `lampstand upgrade` plants it in
+  houses that lack it.
+
 ## 0.2.1
 
 An update that `lampstand upgrade` cannot apply for you now has a way to be taken or declined.

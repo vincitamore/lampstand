@@ -31,13 +31,13 @@ lampstand needs Node 22.13 or newer (or Bun) and git.
 
 ```sh
 # OMP
-omp plugin install "github:vincitamore/lampstand#v0.2.1"
+omp plugin install "github:vincitamore/lampstand#v0.2.2"
 
 # Hermes (asks before enabling; lampstand has no Node dependencies, so answer no to that question)
 hermes plugins install vincitamore/lampstand
 
 # the CLI
-npm install -g "github:vincitamore/lampstand#v0.2.1"
+npm install -g "github:vincitamore/lampstand#v0.2.2"
 
 # plant a house
 lampstand init ~/my-house
