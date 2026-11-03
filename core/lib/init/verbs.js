@@ -45,10 +45,14 @@ function compileLines(result) {
 
 /**
  * The terminal conversation: explanations and prompts on stderr, so --json keeps stdout to its one object. Lines
- * are queued as they arrive, so answers pasted several at once are each kept for the question they answer.
+ * are queued as they arrive, so answers pasted several at once are each kept for the question they answer. An
+ * answer the terminal did not echo next to its prompt (one that was queued, or any answer without a terminal) ends
+ * the prompt's line, so the next explanation never starts in the middle of it.
+ * @param {NodeJS.ReadableStream} [input]
+ * @param {NodeJS.WritableStream} [output]
  */
-function terminal() {
-  const rl = createInterface({ input: process.stdin, output: process.stderr });
+export function terminal(input = process.stdin, output = process.stderr) {
+  const rl = createInterface({ input, output });
   /** @type {string[]} */
   const lines = [];
   /** @type {((line: string | null) => void) | null} */
@@ -70,7 +74,7 @@ function terminal() {
   return {
     /** @param {string} text */
     show(text) {
-      process.stderr.write(`${text}\n`);
+      output.write(`${text}\n`);
     },
     /** @param {string} question @returns {Promise<string>} */
     async ask(question) {
@@ -79,6 +83,7 @@ function terminal() {
       const queued = lines.shift();
       const line = queued !== undefined ? queued : ended ? null : await new Promise((resolve) => (waiting = resolve));
       if (line === null) throw fail("E_USAGE", "the input ended before every question was answered; nothing was planted");
+      if (!rl.terminal || queued !== undefined) output.write("\n");
       return line;
     },
     close() {

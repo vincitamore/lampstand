@@ -30,7 +30,14 @@ agora refuses to watch such a room without the list, and lampstand never suggest
 What a room message is to an agent is a provision of this house: `lampstand rooms enable` files it as a proposal in
 `proposals/provisions/room-messages.md`, and it is in force once you adopt it with `lampstand adopt`.
 
+## Who posts
+
+agora signs a room post with `--as`, else the `AGORA_ACTOR` variable, else the seat's default actor from its config.
+With `[modules] rooms = true`, the OMP and Hermes plugins set `AGORA_ACTOR` to this house's name for its sessions, so a
+reply is signed as the house and not as whoever the seat usually is. A value you already set is kept, and agora's config
+is never written.
+
 ## Checking
 
-`lampstand rooms status` shows the agora version, how its OMP extension is installed, and whether it loads twice.
-`lampstand doctor` checks the same and more.
+`lampstand rooms status` shows the agora version, how its OMP extension is installed, whether it loads twice, and who
+room posts will sign as. `lampstand doctor` checks the same and more.

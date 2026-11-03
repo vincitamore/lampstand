@@ -236,3 +236,20 @@ test("status: agora's extension as an OMP plugin, by path, and both (loaded twic
   assert.equal(status.status, 0);
   assert.deepEqual([out.extension.plugin, out.extension.path, out.extension.twice], [false, true, false]);
 });
+
+test("status names who room posts will sign as: an explicit AGORA_ACTOR, the house name once rooms are on, else agora's actor.name", SLOW, async (t) => {
+  const dir = tempDir(t);
+  const env = roomsEnv(dir);
+  const root = plantHouse(dir, env);
+  fakeAgora(dir, "0.2.5");
+  plant(join(String(env.HOME), ".agora"), { "config.json": JSON.stringify({ actor: { name: "Fable" } }) });
+  /** @param {NodeJS.ProcessEnv} e */
+  const bearer = async (e) => envelope((await lampstand(["rooms", "status", "--json"], { env: e, cwd: root })).stdout).bearer;
+
+  assert.deepEqual(await bearer(env), { name: "Fable", source: "agora actor.name" }, "rooms off: the seat's default");
+  turnOn(root);
+  assert.deepEqual(await bearer(env), { name: "test-house", source: "house name" });
+  assert.deepEqual(await bearer({ ...env, AGORA_ACTOR: "Ada/watch" }), { name: "Ada/watch", source: "AGORA_ACTOR" });
+  const text = (await lampstand(["rooms", "status"], { env, cwd: root })).stdout;
+  assert.match(text, /\nroom posts sign as: test-house \(house name\)\n?/);
+});

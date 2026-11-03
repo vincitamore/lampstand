@@ -4,6 +4,14 @@
 
 Found by running a house day to day with a live model.
 
+- `lampstand init` now plants a default ask-first list (irreversible deletes, history rewrites, publishing or pushing to
+  a remote, spending money, messaging people outside the house, sending secrets or private data away, changing live
+  systems) before the operator's own lines. Interactive init asks `Keep these? [Y/n]`; an answers file takes
+  `ask_first_defaults = false` to plant only its own `ask_first`. The defaults take about 210 characters of the kernel.
+  Houses planted before keep the list they have, since `house.toml` is the operator's: to add the defaults, copy the
+  lines from `DEFAULT_ASK_FIRST` in `core/lib/init/answers.js` (also listed in `docs/first-run.md`) into
+  `[charter] ask_first`, then run `lampstand compile`.
+
 - The maintenance gate charges a session only for what it changed. Work an earlier session left uncommitted was
   owed again by every session after it.
 - `lampstand init`, `adopt`, `upgrade` and `rooms enable` commit what they wrote, touching only those paths. When git

@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { contentHash } from "../../core/lib/io.js";
 import { parseFrontmatter } from "../../core/lib/frontmatter.js";
-import { PURPOSE_MAX, kernelFit } from "../../core/lib/init/answers.js";
+import { DEFAULT_ASK_FIRST, PURPOSE_MAX, kernelFit } from "../../core/lib/init/answers.js";
+import { parseToml } from "../../core/lib/parse/toml.js";
 import { readSeat } from "../../core/lib/seat/ledger.js";
 import { answersToml, envelope, isolatedEnv, lampstand, plant, read, REPO, SLOW, tempDir, treeHash } from "./helpers.js";
 
@@ -53,7 +54,8 @@ test("init with an answers file plants a house that compiles fresh and lints cle
 
   const toml = read(s.house, "house.toml");
   assert.match(toml, /\[budget\]\nprofile = "large"\n/);
-  assert.match(toml, /\[charter\]\nmode = "rules"\nask_first = \["Ask before pushing to any remote\."\]\n/);
+  assert.match(toml, /\[charter\]\nmode = "rules"\nask_first = \[/);
+  assert.deepEqual(parseToml(toml, "house.toml").charter, { mode: "rules", ask_first: [...DEFAULT_ASK_FIRST, "Ask before pushing to any remote."] });
   assert.match(read(s.house, "voice.md"), /\n## chat\nShort replies\.\n$/);
   assert.equal(read(s.house, "charter/core.md"), read(REPO, "templates/constitution/charter/core.rules.md").replaceAll("\r\n", "\n"));
 
@@ -134,8 +136,8 @@ test("an answer the house would refuse stops init before its first write", SLOW,
 
 test("answers whose kernel would overflow its cap are refused before the first write; the largest that fits compiles to the predicted size", SLOW, (t) => {
   // The purpose, one line per principle and the ask-first lines share the kernel's hard cap, so a purpose within its
-  // own limit can still be refused beside the lattice. answersToml plants the lattice and one ask-first line.
-  const fits = (/** @type {number} */ n) => kernelFit({ purpose: "x".repeat(n), askFirst: ["Ask before pushing to any remote."], lattice: true });
+  // own limit can still be refused beside the lattice. answersToml plants the lattice, the default ask-first lines and one of its own.
+  const fits = (/** @type {number} */ n) => kernelFit({ purpose: "x".repeat(n), askFirst: [...DEFAULT_ASK_FIRST, "Ask before pushing to any remote."], lattice: true });
   let largest = 0;
   while (fits(largest + 1).over === 0) largest += 1;
   assert.ok(largest < PURPOSE_MAX, "the lattice leaves less room than the purpose's own limit");
@@ -153,6 +155,22 @@ test("answers whose kernel would overflow its cap are refused before the first w
   assert.equal(planted.status, 0, planted.stdout + planted.stderr);
   const manifest = JSON.parse(readFileSync(join(exact.house, ".house", "generated", "manifest.json"), "utf8"));
   assert.equal(manifest.surfaces.kernel.chars, fits(largest).chars, "the prediction is the compiler's own measure");
+});
+
+test("an answers file without ask_first_defaults plants the defaults then its own lines; false plants only its own; true repeats nothing", SLOW, (t) => {
+  /** @param {string} text */
+  const askFirstOf = (text, extra = "") => {
+    const s = setup(t, text);
+    const result = s.run(["init", "house", "--answers", "answers.toml", "--json"]);
+    assert.equal(result.status, 0, extra + result.stdout + result.stderr);
+    return /** @type {string[]} */ (parseToml(read(s.house, "house.toml"), "house.toml").charter && /** @type {any} */ (parseToml(read(s.house, "house.toml"), "house.toml").charter).ask_first);
+  };
+  assert.deepEqual(askFirstOf(answersToml()), [...DEFAULT_ASK_FIRST, "Ask before pushing to any remote."]);
+  assert.deepEqual(askFirstOf(answersToml("ask_first_defaults = true")), [...DEFAULT_ASK_FIRST, "Ask before pushing to any remote."]);
+  assert.deepEqual(askFirstOf(answersToml("ask_first_defaults = false")), ["Ask before pushing to any remote."]);
+  assert.deepEqual(askFirstOf(answersToml().replace(/^ask_first = .*$/m, "")), [...DEFAULT_ASK_FIRST]);
+  assert.deepEqual(askFirstOf(answersToml().replace(/^ask_first = .*$/m, `ask_first = [${JSON.stringify(DEFAULT_ASK_FIRST[1])}, "Mine"]`)), [...DEFAULT_ASK_FIRST, "Mine"]);
+  assert.deepEqual(askFirstOf(answersToml("ask_first_defaults = false").replace(/^ask_first = .*$/m, "")), []);
 });
 
 test("--no-lattice plants no principles and keeps the standard profile; the house still compiles", SLOW, (t) => {
@@ -213,4 +231,14 @@ test("seat reset of a default_house that was unset removes the config it created
   assert.ok(!existsSync(join(s.dir, "config-root", "lampstand")), "nothing of lampstand's is left in the config root");
   const empty = s.run(["seat", "status"]);
   assert.match(empty.stdout, /^the seat ledger is empty/);
+});
+
+test("a charter = none house is planted with a charter that says there is none yet and how to start one, and keeps its record", SLOW, (t) => {
+  const s = setup(t, answersToml().replace('charter = "rules"', 'charter = "none"'));
+  const result = s.run(["init", "house", "--answers", "answers.toml", "--json"]);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(read(s.house, "charter/core.md"), /^# Charter\n\nThis house has no charter yet \(`none` mode\): no provisions are enacted[\s\S]*mode = "rules"/);
+  assert.ok(existsSync(join(s.house, "charter", "record.md")));
+  assert.equal(s.run(["compile", "--check"], s.house).status, 0);
+  assert.equal(s.run(["lint"], s.house).status, 0);
 });

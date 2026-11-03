@@ -20,21 +20,22 @@ export const HERMES_CONTEXT_FILE_FLOOR = 20_000;
 /** @typedef {{ chars: number, cap: number, over: number }} Fit */
 
 /**
- * The longest purpose the tree's init accepts beside its lattice with no ask-first lines: at most `max` characters,
+ * The longest purpose the tree's init accepts beside its lattice and the ask-first lines `askFirst` (the defaults init plants): at most `max` characters,
  * and short enough that the kernel fits its cap (init refuses answers whose kernel would not), measured by the tree's
  * own `kernelFit`. It ends on a non-space, so the answer's trim keeps every character. With an empty purpose still
  * over the cap, `fit` says by how much.
  * @param {(answers: { purpose: string, askFirst: string[], lattice: boolean }) => Fit} kernelFit
  * @param {number} max
+ * @param {readonly string[]} [askFirst]
  * @returns {{ purpose: string, fit: Fit }}
  */
-export function longPurpose(kernelFit, max) {
+export function longPurpose(kernelFit, max, askFirst = []) {
   const sentence = "The work is for the people who rely on what this house keeps and decides, and for the ones who come after. ";
   const text = (/** @type {number} */ n) => {
     const cut = sentence.repeat(Math.ceil(n / sentence.length) + 1).slice(0, n);
     return cut.endsWith(" ") ? `${cut.slice(0, -1)}.` : cut;
   };
-  const fitOf = (/** @type {number} */ n) => kernelFit({ purpose: text(n), askFirst: [], lattice: true });
+  const fitOf = (/** @type {number} */ n) => kernelFit({ purpose: text(n), askFirst: [...askFirst], lattice: true });
   let n = max;
   while (n > 0 && fitOf(n).over > 0) n -= 1;
   return { purpose: text(n), fit: fitOf(n) };
@@ -69,10 +70,10 @@ runGate("context-budget", "node dev/context-budget.js [--root <lampstand tree>]"
   const bin = join(root, "core", "bin", "lampstand.js");
   if (!existsSync(bin)) throw new GateError(`${bin} does not exist`);
   // The tree's own answers module, so the purpose is measured against that tree's lattice and caps.
-  const { kernelFit, PURPOSE_MAX } = await import(pathToFileURL(join(root, "core", "lib", "init", "answers.js")).href);
-  const { purpose, fit } = longPurpose(kernelFit, PURPOSE_MAX);
+  const { kernelFit, PURPOSE_MAX, DEFAULT_ASK_FIRST } = await import(pathToFileURL(join(root, "core", "lib", "init", "answers.js")).href);
+  const { purpose, fit } = longPurpose(kernelFit, PURPOSE_MAX, DEFAULT_ASK_FIRST);
   if (fit.over > 0) {
-    const finding = `context-budget: kernel is ${fit.chars} chars with an empty purpose and no ask-first lines (with ${KERNEL_FRAMING_CHARS} of Hermes section framing), over its hard cap of ${fit.cap}; init refuses every answer`;
+    const finding = `context-budget: kernel is ${fit.chars} chars with an empty purpose and the default ask-first lines (with ${KERNEL_FRAMING_CHARS} of Hermes section framing), over its hard cap of ${fit.cap}; init refuses every answer`;
     return report("context-budget", [finding], "", "1 budget failures");
   }
   const temp = realpathSync.native(mkdtempSync(join(tmpdir(), "lampstand-context-budget-")));
@@ -91,7 +92,7 @@ runGate("context-budget", "node dev/context-budget.js [--root <lampstand tree>]"
 
     /** @type {string[]} */
     const findings = [];
-    const lines = [`context-budget: house planted with the lattice and a ${chars(purpose)}-character purpose; profile ${data.profile}`];
+    const lines = [`context-budget: house planted with the lattice, the default ask-first lines and a ${chars(purpose)}-character purpose; profile ${data.profile}`];
     lines.push("surfaces (as the compiler measures them):");
     /** @type {Record<string, { chars: number, cap: number, tokens: number }>} */
     const surfaces = data.surfaces ?? {};

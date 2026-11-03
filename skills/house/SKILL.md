@@ -61,9 +61,11 @@ Run `lampstand <verb> --help` for flags; add `--json` for one machine-readable o
 2. **Files are written through verbs** where a verb exists. Hand edits to frontmatter skip the checks the verbs make.
 3. **A changed normative file is recompiled.** After editing anything under `principles/`, `charter/`, `reflexes/` or
    `voice.md`, run `lampstand compile`; `compile --check` failing means the projections are stale.
-4. **Ask first** before anything on the ask-first list in `house.toml` (by default: irreversible deletes, history
-   rewrites, publishing, spending, messaging people, secrets leaving the machine, live systems). The list is the
-   operator's; follow it even when the action looks harmless.
+4. **Ask first** before anything on the ask-first list in `house.toml`. `init` plants these defaults unless the operator
+   declined them (irreversible deletes, history rewrites, publishing or pushing, spending, messaging people outside
+   the house, secrets or private data leaving, live systems), then their own lines; an older house has only what its
+   operator wrote. The list is the operator's; follow it even when the action looks harmless. A request that names the
+   act is consent to that act as named, never to a wider scope: when what it covers is open, ask which is meant.
 5. **Never adopt for the operator, and never recommend in an adopt.** The CLI refuses principles and provisions from
    your shell (`E_OPERATOR_ONLY`); only reflexes are yours to admit. You may propose with an occasion; the operator
    decides. Whoever is judged by a lens does not shape it.

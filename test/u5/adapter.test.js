@@ -95,6 +95,25 @@ test("the factory marks the agent's environment, and the operator's /lampstand a
   assert.equal(process.env.LAMPSTAND_AGENT, "omp", "the command does not strip the marker from the agent's own process");
 });
 
+test("a house with rooms on names itself in AGORA_ACTOR; an actor already set is kept; rooms off sets nothing", async (t) => {
+  const on = compiledHouse(t, "[modules]\nrooms = true");
+  const host = await stubHost();
+  const { ctx } = session(on);
+
+  delete process.env.AGORA_ACTOR;
+  await host.emit("session_start", { type: "session_start" }, ctx);
+  assert.equal(process.env.AGORA_ACTOR, "test-house");
+
+  process.env.AGORA_ACTOR = "Ada/watch";
+  await host.emit("session_start", { type: "session_start" }, ctx);
+  assert.equal(process.env.AGORA_ACTOR, "Ada/watch", "an explicit actor is never overridden");
+
+  const off = compiledHouse(t);
+  delete process.env.AGORA_ACTOR;
+  await host.emit("session_start", { type: "session_start" }, session(off).ctx);
+  assert.equal(process.env.AGORA_ACTOR, undefined);
+});
+
 test("main session: the orientation is queued once for the next turn, and the router is appended once", async (t) => {
   const root = compiledHouse(t);
   const host = await stubHost();

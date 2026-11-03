@@ -10,7 +10,8 @@
 //   co_owners = []
 //   purpose = "who the work is for"  # at most 600 characters
 //   charter = "rules"               # none | rules | agreement (default rules)
-//   ask_first = ["..."]
+//   ask_first = ["..."]             # your own lines, added after the defaults below
+//   ask_first_defaults = true       # plant DEFAULT_ASK_FIRST first (default true); false plants only ask_first
 //   channel_manners = ["## chat", "Short replies."]   # lines, or one string
 //   lattice = true                  # plant the lattice (default) or start with no principles
 import { basename } from "node:path";
@@ -28,6 +29,20 @@ import { LATTICE_FILE, latticeFile } from "./plant.js";
 /** @typedef {{ show(text: string): void, ask(question: string): Promise<string> }} Conversation */
 
 export const PURPOSE_MAX = 600;
+
+/**
+ * The ask-first lines a house starts with unless its operator declines them: the actions an agent must ask about
+ * whatever else the house is for. They ride in the kernel of every session, so the list stays short.
+ */
+export const DEFAULT_ASK_FIRST = Object.freeze([
+  "Irreversible deletes",
+  "Rewriting git history",
+  "Publishing or pushing to a remote",
+  "Spending money",
+  "Messaging people outside the house",
+  "Sending secrets or private data away",
+  "Changing live systems",
+]);
 
 /**
  * The kernel these answers compile to, measured as the compiler measures it (with Hermes's section framing), against
@@ -66,6 +81,7 @@ export const ANSWERS_SCHEMA = {
     purpose: { type: "string", maxLength: PURPOSE_MAX },
     charter: { type: "string", enum: [...CHARTER_MODES] },
     ask_first: { type: "array", items: { type: "string", minLength: 1, pattern: "^[^\\n]*\\S[^\\n]*$" } },
+    ask_first_defaults: { type: "boolean" },
     channel_manners: {},
     lattice: { type: "boolean" },
   },
@@ -80,6 +96,7 @@ export const ANSWERS_SCHEMA = {
  *   purpose?: string,
  *   charter?: Answers["charter"],
  *   ask_first?: string[],
+ *   ask_first_defaults?: boolean,
  *   channel_manners?: string | string[],
  *   lattice?: boolean,
  * }} AnswersFile
@@ -105,6 +122,15 @@ export function readAnswersFile(path) {
 }
 
 /**
+ * The ask-first lines an answers file gives: the defaults unless declined, then its own lines, each once.
+ * @param {AnswersFile} file
+ */
+function askFirstFrom(file) {
+  const own = (file.ask_first ?? []).map((line) => line.trim());
+  return [...new Set([...(file.ask_first_defaults === false ? [] : DEFAULT_ASK_FIRST), ...own])];
+}
+
+/**
  * The answers for a house in `dir`, from a file's values and the defaults.
  * @param {AnswersFile} file
  * @param {string} dir  the house's folder, absolute
@@ -119,7 +145,7 @@ export function answersFrom(file, dir, options) {
     coOwners: (file.co_owners ?? []).map((owner) => owner.trim()),
     purpose: (file.purpose ?? "").trim(),
     charter: file.charter ?? "rules",
-    askFirst: (file.ask_first ?? []).map((line) => line.trim()),
+    askFirst: askFirstFrom(file),
     channelManners: (Array.isArray(manners) ? manners.join("\n") : (manners ?? "")).trim(),
     lattice: !options.noLattice && (file.lattice ?? true),
   };
@@ -179,7 +205,7 @@ export async function askAnswers(talk, options) {
   }
 
   talk.show(
-    "\n5. How rules work. none: no charter, nothing is enacted. rules: you enact provisions; the agent may only draft them as proposals. agreement: a provision is enacted when you and the co-owners agree to it.",
+    "\n5. How rules work. none: no charter, no provisions are enacted. rules: you enact provisions; the agent may only draft them as proposals. agreement: a provision is enacted when you and the co-owners agree to it.",
   );
   /** @type {string} */
   let charter = (await talk.ask("none, rules or agreement [rules]: ")).trim() || "rules";
@@ -189,8 +215,11 @@ export async function askAnswers(talk, options) {
   }
 
   talk.show(
-    "\n6. Ask-first lines and channel manners. Ask-first lines are what the agent must ask you about before doing, one per line; every session carries them. An empty line ends the list.",
+    `\n6. Ask-first lines and channel manners. Ask-first lines are what the agent must ask you about before doing; every session carries them. These come first:\n${DEFAULT_ASK_FIRST.map((line) => `  - ${line}`).join("\n")}`,
   );
+  const keep = (await talk.ask("Keep these? [Y/n]: ")).trim().toLowerCase();
+  const defaults = !(keep === "n" || keep === "no");
+  talk.show("Your own ask-first lines are added after them, one per line. An empty line ends the list.");
   const askFirst = (await askLines(talk, "Ask first: ")).map((line) => line.trim());
   talk.show(
     "Channel manners: how the agent should carry itself with you, and in each channel you use (a `## <channel>` line starts a channel's norms). They go into voice.md. An empty line ends them.",
@@ -198,7 +227,7 @@ export async function askAnswers(talk, options) {
   const channelManners = await askLines(talk, "> ");
 
   /** @type {AnswersFile} */
-  const file = { name, operator, co_owners: coOwners, purpose, charter: /** @type {Answers["charter"]} */ (charter), ask_first: askFirst, channel_manners: channelManners };
+  const file = { name, operator, co_owners: coOwners, purpose, charter: /** @type {Answers["charter"]} */ (charter), ask_first: askFirst, ask_first_defaults: defaults, channel_manners: channelManners };
   if (!options.noLattice) {
     talk.show(
       "\nPrinciples. The lattice is a pack of thirteen principles that lampstand can copy into principles/lattice.md as your own adopted copy, yours from then on to edit or strike; it needs the large budget profile, which init then sets. Or start with no principles and adopt your own later.",

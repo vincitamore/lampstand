@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
-import { askAnswers } from "../../core/lib/init/answers.js";
+import { askAnswers, DEFAULT_ASK_FIRST } from "../../core/lib/init/answers.js";
 
 /**
  * A scripted conversation: each ask takes the next reply and logs it after everything shown so far.
@@ -32,7 +32,7 @@ const HOME = join(BASE, "ours");
 const options = { where: HOME, resolve: (/** @type {string} */ answer) => resolve(BASE, answer), planted: () => false, noLattice: false };
 
 test("each of the six questions is explained before it is asked, and the answers are recorded as given", async () => {
-  const talk = script(["", "", "ana", "ben, cy", "For the clinic's families.", "maybe", "agreement", "Ask before pushing.", "", "## chat", "Short.", "", "n"]);
+  const talk = script(["", "", "ana", "ben, cy", "For the clinic's families.", "maybe", "agreement", "", "Ask before pushing.", "", "## chat", "Short.", "", "n"]);
   const { dir, file } = await askAnswers(talk, options);
   assert.equal(dir, HOME);
   assert.deepEqual(file, {
@@ -42,6 +42,7 @@ test("each of the six questions is explained before it is asked, and the answers
     purpose: "For the clinic's families.",
     charter: "agreement",
     ask_first: ["Ask before pushing."],
+    ask_first_defaults: true,
     channel_manners: ["## chat", "Short."],
     lattice: false,
   });
@@ -55,7 +56,7 @@ test("each of the six questions is explained before it is asked, and the answers
 });
 
 test("an over-long purpose is asked again; --no-lattice asks nothing about the lattice", async () => {
-  const talk = script(["", "named", "", "", "x".repeat(601), "short", "", "", ""]);
+  const talk = script(["", "named", "", "", "x".repeat(601), "short", "", "", "", ""]);
   const { file } = await askAnswers(talk, { ...options, noLattice: true });
   assert.equal(file?.purpose, "short");
   assert.equal(file?.charter, "rules");
@@ -68,4 +69,27 @@ test("a folder that already holds a house ends the questions after the first", a
   const talk = script(["standing"]);
   const result = await askAnswers(talk, { ...options, planted: (dir) => dir.endsWith("standing") });
   assert.deepEqual(result, { dir: join(BASE, "standing"), file: null });
+});
+
+test("question 6 shows the default ask-first lines first; Keep? takes yes by default, no declines them, and the operator's lines are added after", async () => {
+  const keep = script(["", "", "", "", "For the clinic.", "", "", "", "", "", "n"]);
+  const kept = await askAnswers(keep, options);
+  assert.equal(kept.file?.ask_first_defaults, true);
+  const six = keep.log.findIndex((line) => line.startsWith("show 6. "));
+  for (const line of DEFAULT_ASK_FIRST) assert.ok(keep.log[six].includes(`- ${line}`), line);
+  assert.equal(keep.log[six + 1], "ask Keep these? [Y/n]:", "the defaults are shown, then asked about");
+
+  for (const no of ["n", "No"]) {
+    const declined = script(["", "", "", "", "For the clinic.", "", no, "Ask before pushing.", "Ask before emailing.", "", "", "n"]);
+    const { file } = await askAnswers(declined, options);
+    assert.equal(file?.ask_first_defaults, false);
+    assert.deepEqual(file?.ask_first, ["Ask before pushing.", "Ask before emailing."]);
+  }
+});
+
+test("the default lines count toward the kernel: a purpose too long beside them is asked again", async () => {
+  const talk = script(["", "", "", "", "x".repeat(450), "", "", "", "", "", "short"]);
+  const { file } = await askAnswers(talk, options);
+  assert.equal(file?.purpose, "short");
+  assert.ok(talk.log.some((line) => /^show The kernel would be \d+ characters, \d+ over its cap of 4000/.test(line)));
 });

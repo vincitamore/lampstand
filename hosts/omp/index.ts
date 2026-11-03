@@ -23,6 +23,7 @@ import { commitLine } from "../../core/lib/commit.js";
 import { isLampstandError } from "../../core/lib/errors.js";
 import { checkGate } from "../../core/lib/gate.js";
 import { splitRouter } from "../../core/lib/init/region.js";
+import { markRoomActor } from "../../core/lib/rooms/actor.js";
 import { normalizeLf } from "../../core/lib/io.js";
 import { registry } from "../../core/lib/verbs.js";
 import { capLines, orient } from "../../core/lib/orient.js";
@@ -288,6 +289,8 @@ export default function lampstand(pi: HostApi): void {
     // Outside a house the plugin is silent: installed globally, it would otherwise speak in every session. `/lampstand
     // status` still says there is no house when asked.
     if (root === null) return;
+    // A house with rooms on signs its sessions' room posts as itself, never as the seat's default agora actor.
+    markRoomActor(root, process.env);
     const head = spawnSync("git", ["-C", root, "rev-parse", "--verify", "--quiet", "HEAD"], { encoding: "utf8" });
     started = { since: head.status === 0 ? head.stdout.trim() : "", sinceMs: Date.now() };
     // Verifies the router's input hash now, so a stale or missing projection is told before the first prompt.

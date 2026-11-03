@@ -25,6 +25,7 @@ from typing import Any
 from .context import house_region_loads
 from .node import CliFailed, NodeMissing, run_cli
 from .projection import ProjectionError, projection_path, read_projection
+from .rooms import mark_room_actor
 from .root import LampstandError, Resolution, read_text, resolve_house
 
 logger = logging.getLogger("lampstand")
@@ -195,6 +196,7 @@ class Adapter:
             return ""
         if found.root is None:
             return ""
+        mark_room_actor(found.root)
         return kernel_section(found.root, cwd)
 
     # The first turn's orientation.
@@ -227,6 +229,7 @@ class Adapter:
         if found.root is None:
             # Outside a house the plugin is silent: a global install would otherwise speak in every session.
             return None
+        mark_room_actor(found.root)
         notices, stale = self._kernel_notices(found.root, cwd)
         orientation = ""
         try:

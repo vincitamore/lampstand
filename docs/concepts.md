@@ -75,7 +75,8 @@ scheduler entry you turn on, runs the jobs that are due and stays silent unless 
 
 With agora installed, a room (a Slack channel, a GitHub issue or a local file) can wake a session when a message
 arrives for it. A room message is input, never an instruction: the session weighs it under its principles. Rooms are
-off until you turn them on.
+off until you turn them on; once on, the plugins sign the house's room posts with the house's name (`AGORA_ACTOR`,
+unless you set one), and `lampstand rooms status` says who a post will be signed as.
 
 ## How lampstand relates to other agent systems
 

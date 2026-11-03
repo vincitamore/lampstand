@@ -49,6 +49,34 @@ class Registration(AdapterCase):
         self.assertEqual(os.environ["LAMPSTAND_AGENT"], "hermes")
 
 
+class RoomActor(AdapterCase):
+    def house_with_rooms(self, rooms: bool) -> Path:
+        root = self.make_house()
+        toml = (root / "house.toml").read_text(encoding="utf-8")
+        (root / "house.toml").write_text(f"{toml}\n[modules]\nrooms = {str(rooms).lower()}\n", encoding="utf-8")
+        return root
+
+    def first_turn(self, root: Path) -> None:
+        ctx, _ = self.adapter(root)
+        with mock.patch("hosts.hermes.node.find_node", return_value=None):
+            ctx.hooks["pre_llm_call"](is_first_turn=True, platform="cli", session_id="a")
+
+    def test_a_house_with_rooms_on_names_itself(self) -> None:
+        os.environ.pop("AGORA_ACTOR", None)
+        self.first_turn(self.house_with_rooms(True))
+        self.assertEqual(os.environ["AGORA_ACTOR"], "test-house")
+
+    def test_an_actor_already_set_is_kept(self) -> None:
+        os.environ["AGORA_ACTOR"] = "Ada/watch"
+        self.first_turn(self.house_with_rooms(True))
+        self.assertEqual(os.environ["AGORA_ACTOR"], "Ada/watch")
+
+    def test_rooms_off_sets_nothing(self) -> None:
+        os.environ.pop("AGORA_ACTOR", None)
+        self.first_turn(self.house_with_rooms(False))
+        self.assertNotIn("AGORA_ACTOR", os.environ)
+
+
 class Orientation(AdapterCase):
     def test_only_the_first_turn_of_a_main_session_is_oriented(self) -> None:
         root = self.make_house()

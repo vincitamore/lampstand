@@ -15,6 +15,7 @@ import { fullPath, PLANTED_FILE } from "../init/plant.js";
 import { resolveHouse } from "../root.js";
 import { commandRunner } from "../doctor/util.js";
 import { AGORA_FLOOR, AGORA_INSTALL, agoraExtension, agoraProblemText, detectAgora } from "./agora.js";
+import { bearerFor } from "./actor.js";
 import { applyEnable, checkExampleRow, planEnable, planIsEmpty, roomsTemplates } from "./house.js";
 
 /** @typedef {import("../cli.js").Verb} Verb */
@@ -177,13 +178,14 @@ export async function enableRooms(context, templates, confirm) {
 /** @type {Verb} */
 export const roomsStatusVerb = {
   name: "rooms status",
-  summary: "agora's version, whether OMP loads its extension as a plugin or by path, and whether it loads twice",
+  summary: "agora's version, whether OMP loads its extension as a plugin or by path, whether it loads twice, and who room posts sign as",
   run(context) {
     const agora = detectAgora(context.env, commandRunner(context.env));
     const found = resolveHouse({ env: context.env, cwd: context.cwd });
     const house = found.root === null ? null : { root: found.root, rooms: loadHouseConfig(found.root).modules?.rooms === true };
     if (agora.problem === "AGORA_MISSING") return agoraRefusal(agora, { extension: null, house });
 
+    const bearer = house === null ? null : bearerFor(house.root, context.env, context.cwd);
     const extension = agoraExtension(context.env, context.cwd);
     const problem = agoraProblemText(agora);
     const how = extension.loads.length === 0
@@ -197,12 +199,13 @@ export const roomsStatusVerb = {
         : "loaded twice: no",
       ...extension.unreadable.map((failure) => `not read: ${failure.message}`),
       house === null ? "house: none here" : `house: ${house.root}, [modules] rooms = ${house.rooms}`,
+      ...(bearer === null ? [] : [bearer.name === null ? "room posts sign as: unknown (agora's config names no actor)" : `room posts sign as: ${bearer.name} (${bearer.source})`]),
     ];
     const bad = problem !== null || extension.twice;
     return {
       ok: !bad,
       exit: bad ? 1 : 0,
-      data: { agora: agoraData(agora), extension, house, install: problem === null ? null : AGORA_INSTALL },
+      data: { agora: agoraData(agora), extension, house, bearer, install: problem === null ? null : AGORA_INSTALL },
       text: lines.join("\n"),
     };
   },

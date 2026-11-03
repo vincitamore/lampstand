@@ -30,7 +30,7 @@ test("context-budget passes a house whose kernel fits and whose AGENTS.md is und
   const root = tree(t, { "packs/lattice/LATTICE.md": lattice(3, 80) });
   const run = gate("context-budget.js", ["--root", root], tempDir(t));
   assert.equal(run.status, 0, run.out);
-  assert.match(run.stdout, /house planted with the lattice and a \d+-character purpose/);
+  assert.match(run.stdout, /house planted with the lattice, the default ask-first lines and a \d+-character purpose/);
   assert.match(run.stdout, /^ {2}kernel +\d+ chars/m);
   assert.match(run.stdout, /^ {2}AGENTS\.md +\d+ chars {2}\(floor 20000\)$/m);
 });
@@ -41,7 +41,7 @@ test("context-budget fails when the lattice's kernel lines alone are over its ha
   const root = tree(t, { "packs/lattice/LATTICE.md": lattice(12, 400) });
   const run = gate("context-budget.js", ["--root", root], tempDir(t));
   assert.equal(run.status, 1, run.out);
-  assert.match(run.stdout, /^context-budget: kernel is \d+ chars with an empty purpose and no ask-first lines \(with 79 of Hermes section framing\), over its hard cap of 4000; init refuses every answer$/m);
+  assert.match(run.stdout, /^context-budget: kernel is \d+ chars with an empty purpose and the default ask-first lines \(with 79 of Hermes section framing\), over its hard cap of 4000; init refuses every answer$/m);
 });
 
 test("context-budget fails when AGENTS.md is over the Hermes context-file floor", (t) => {
