@@ -6,7 +6,8 @@ import { fail } from "../errors.js";
 import { WORKSPACE_FLAGS, resolveHouse } from "../root.js";
 import { today } from "../constitution/curate.js";
 import { answersFrom, askAnswers, kernelFit, kernelFitText, readAnswersFile } from "./answers.js";
-import { initHouse } from "./init.js";
+import { commitLine } from "../commit.js";
+import { initHouse, PLANT_MESSAGE } from "./init.js";
 import { regionProblem } from "./region.js";
 import { upgradeHouse } from "./upgrade.js";
 
@@ -88,7 +89,7 @@ function terminal() {
 /** @type {Verb} */
 export const initVerb = {
   name: "init",
-  summary: "plant a house: the six Plant questions (or --answers), missing files only, git init, compile",
+  summary: "plant a house: the six Plant questions (or --answers), missing files only, git init, compile, commit what was planted",
   args: { min: 0, max: 1, usage: "[<dir>]" },
   flags: {
     answers: { type: "string", summary: "a TOML file holding the answers, for planting without a terminal" },
@@ -149,8 +150,15 @@ export const initVerb = {
     });
 
     const compile = compileLines(result);
+    // A repository init just created holds nothing but the plant, so the by-hand command can be the short one.
+    const commit =
+      result.commit !== null && result.commit.status === "uncommitted" && result.commit.command !== null && result.git === "initialized"
+        ? { ...result.commit, command: `git add -A && git commit -m "${PLANT_MESSAGE}"` }
+        : result.commit;
     const git =
-      result.git === "initialized" ? "git: initialized a repository (nothing committed)" : result.git === "existing" ? "git: already a repository" : "git: unavailable, so no repository was initialized; install git and run git init here";
+      result.git === "unavailable"
+        ? "git: unavailable, so no repository was initialized; install git and run git init here"
+        : `git: ${result.git === "initialized" ? "initialized a repository" : "already a repository"}; ${commit === null ? "" : commitLine(commit, PLANT_MESSAGE).slice("git: ".length)}`;
     const lines = [
       `${standing ? "house" : "planted a house"} at ${result.root}`,
       ...listing("planted", result.planted),
@@ -172,6 +180,8 @@ export const initVerb = {
         removed: result.removed,
         plantedJson: result.plantedJson,
         git: result.git,
+        commit: commit?.status === "committed" ? commit.sha : null,
+        uncommitted: commit?.status === "uncommitted" ? { reason: commit.reason, command: commit.command } : null,
         compile: result.compile,
         region: result.region,
         defaultHouse: result.defaultHouse,

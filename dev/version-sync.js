@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // @ts-check
-// Exits 0 only when package.json, plugin.yaml and the newest CHANGELOG.md heading carry one version
+// Exits 0 only when package.json, plugin.yaml and the newest released CHANGELOG.md heading carry one version
 // (and, with --tag vX.Y.Z, the release tag matches it): npm and Hermes each read their own manifest,
 // so a release whose manifests disagree installs as two different versions.
 import { readFileSync } from "node:fs";
@@ -46,10 +46,18 @@ function pluginVersion() {
   return quoted ? quoted[2] : raw;
 }
 
-function changelogVersion() {
-  const heading = /^## (.*?)[ \t]*\r?$/m.exec(read("CHANGELOG.md"));
-  if (!heading) throw new Error("no '## ' heading");
-  return heading[1];
+/**
+ * The newest released version in CHANGELOG.md. An `## Unreleased` section may sit above it between releases; a
+ * release (--tag) must have renamed it to the version first.
+ * @param {boolean} releasing
+ */
+function changelogVersion(releasing) {
+  const headings = [...read("CHANGELOG.md").matchAll(/^## (.*?)[ \t]*\r?$/gm)].map((match) => match[1]);
+  if (headings.length === 0) throw new Error("no '## ' heading");
+  if (headings[0] !== "Unreleased") return headings[0];
+  if (releasing) throw new Error("the first heading is 'Unreleased'; rename it to the version being released");
+  if (headings.length === 1) throw new Error("no released version below 'Unreleased'");
+  return headings[1];
 }
 
 const { tag } = parseArgs(process.argv.slice(2));
@@ -58,7 +66,7 @@ const { tag } = parseArgs(process.argv.slice(2));
 const sources = [
   ["package.json version", packageVersion],
   ["plugin.yaml version", pluginVersion],
-  ["CHANGELOG.md first heading", changelogVersion],
+  ["CHANGELOG.md newest release heading", () => changelogVersion(tag !== undefined)],
 ];
 /** @type {[string, unknown][]} */
 const found = [];

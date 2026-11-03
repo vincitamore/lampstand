@@ -72,9 +72,35 @@ test("a session that changed nothing owes nothing, and a house with no commit ye
   const fresh = realpathSync.native(mkdtempSync(join(tmpdir(), "lampstand-gate-")));
   t.after(() => rmSync(fresh, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
   git(fresh, "init", "-q");
+  const started = Date.now() - 1_000;
   writeFileSync(join(fresh, "a.txt"), "a\n");
   git(fresh, "add", "a.txt");
-  assert.deepEqual(sessionChanges(fresh, { since: "", sinceMs: Date.now() + 60_000 }), ["a.txt"]);
+  assert.deepEqual(sessionChanges(fresh, { since: "", sinceMs: started }), ["a.txt"]);
+});
+
+test("work an earlier session left uncommitted is not charged to this one, until this session touches it", (t) => {
+  const root = house(t);
+  writeFileSync(join(root, "src", "app.js"), "export const leftOver = true;\n");
+  const past = new Date(Date.now() - 60_000);
+  utimesSync(join(root, "src", "app.js"), past, past);
+  const session = { since: git(root, "rev-parse", "HEAD"), sinceMs: Date.now() - 1_000 };
+
+  assert.deepEqual(sessionChanges(root, session), []);
+  assert.deepEqual(checkGate(root, [], session).owed, []);
+
+  writeFileSync(join(root, "src", "app.js"), "export const leftOver = false;\n");
+  assert.deepEqual(sessionChanges(root, session), ["src/app.js"]);
+  assert.deepEqual(checkGate(root, [], session).owed.map((item) => item.id).sort(), ["state", "task"]);
+});
+
+test("what the session committed counts, even a change older than the session", (t) => {
+  const root = house(t);
+  writeFileSync(join(root, "src", "app.js"), "export const leftOver = true;\n");
+  const past = new Date(Date.now() - 60_000);
+  utimesSync(join(root, "src", "app.js"), past, past);
+  const session = { since: git(root, "rev-parse", "HEAD"), sinceMs: Date.now() - 1_000 };
+  git(root, "commit", "-q", "-am", "land the left-over change");
+  assert.deepEqual(sessionChanges(root, session), ["src/app.js"]);
 });
 
 test("outside a git repository the gate falls back to the paths it observed", (t) => {

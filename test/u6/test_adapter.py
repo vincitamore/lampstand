@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -41,6 +42,13 @@ class AdapterCase(TempTestCase):
             self.skipTest("node is not on PATH")
 
 
+class Registration(AdapterCase):
+    def test_registering_marks_the_agent_environment(self) -> None:
+        os.environ.pop("LAMPSTAND_AGENT", None)
+        self.adapter(self.tmp)
+        self.assertEqual(os.environ["LAMPSTAND_AGENT"], "hermes")
+
+
 class Orientation(AdapterCase):
     def test_only_the_first_turn_of_a_main_session_is_oriented(self) -> None:
         root = self.make_house()
@@ -49,13 +57,11 @@ class Orientation(AdapterCase):
         self.assertIsNone(hook(is_first_turn=False, platform="cli", session_id="a"))
         self.assertIsNone(hook(is_first_turn=True, platform="subagent", session_id="b"))
 
-    def test_a_dormant_session_gets_one_hint_line(self) -> None:
+    def test_a_dormant_session_is_silent(self) -> None:
         elsewhere = self.tmp / "elsewhere"
         elsewhere.mkdir()
         ctx, _ = self.adapter(elsewhere)
-        result = ctx.hooks["pre_llm_call"](is_first_turn=True, platform="cli", session_id="a")
-        self.assertEqual(len(result["context"].splitlines()), 1)
-        self.assertIn("no house resolves", result["context"])
+        self.assertIsNone(ctx.hooks["pre_llm_call"](is_first_turn=True, platform="cli", session_id="a"))
 
     def test_the_first_turn_carries_the_cli_orientation(self) -> None:
         self.require_cli()

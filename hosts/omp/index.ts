@@ -16,10 +16,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { runCli } from "../../core/lib/cli.js";
 import { GENERATED_DIR, projectionMarker, readHeader } from "../../core/lib/constitution/compile.js";
-import { today } from "../../core/lib/constitution/curate.js";
+import { listProposals, today } from "../../core/lib/constitution/curate.js";
 import { inputHash, readInputs } from "../../core/lib/constitution/house.js";
-import { runCompile } from "../../core/lib/constitution/run.js";
-import { adoptInteractively } from "../../core/lib/constitution/verbs.js";
+import { adoptInteractively, settleActs } from "../../core/lib/constitution/verbs.js";
+import { commitLine } from "../../core/lib/commit.js";
 import { isLampstandError } from "../../core/lib/errors.js";
 import { checkGate } from "../../core/lib/gate.js";
 import { splitRouter } from "../../core/lib/init/region.js";
@@ -204,6 +204,9 @@ function words(args: string): string[] {
 const REGISTRY = registry(FORWARDED);
 
 export default function lampstand(pi: HostApi): void {
+  // Marks the agent's environment: the shell tool's children inherit process.env, and `lampstand adopt` refuses
+  // principles and provisions from a shell that carries it. The operator's `/lampstand adopt` never reads it.
+  process.env.LAMPSTAND_AGENT = "omp";
   const version = pi.pi?.VERSION;
   if (!atLeast(version, OMP_FLOOR)) {
     let told = false;
@@ -230,7 +233,7 @@ export default function lampstand(pi: HostApi): void {
     notice(ctx, text, level);
   };
 
-  /** The house for this session's cwd, or null (dormant). Resolution errors are told once and leave it dormant. */
+  /** The house for this session's cwd, or null (dormant, silently). A resolution error is told once and leaves it dormant. */
   const locate = (ctx: HostContext): string | null => {
     try {
       return resolveHouse({ cwd: ctx.cwd, env: process.env }).root;
@@ -282,10 +285,9 @@ export default function lampstand(pi: HostApi): void {
     reminded = false;
     started = null;
     const root = locate(ctx);
-    if (root === null) {
-      once(ctx, "dormant", `lampstand: no house here (no house.toml at or above ${ctx.cwd}); nothing loaded this session`, "info");
-      return;
-    }
+    // Outside a house the plugin is silent: installed globally, it would otherwise speak in every session. `/lampstand
+    // status` still says there is no house when asked.
+    if (root === null) return;
     const head = spawnSync("git", ["-C", root, "rev-parse", "--verify", "--quiet", "HEAD"], { encoding: "utf8" });
     started = { since: head.status === 0 ? head.stdout.trim() : "", sinceMs: Date.now() };
     // Verifies the router's input hash now, so a stale or missing projection is told before the first prompt.
@@ -342,6 +344,7 @@ export default function lampstand(pi: HostApi): void {
       send(`lampstand: E_NO_HOUSE: no house resolved from ${ctx.cwd}`);
       return;
     }
+    const items = listProposals(root);
     const acts = await adoptInteractively(
       root,
       {
@@ -353,11 +356,12 @@ export default function lampstand(pi: HostApi): void {
       today(),
     );
     const lines = acts.length === 0 ? ["no proposed items"] : acts.map((act) => `${act.act} ${act.id}${act.refused ? `: ${act.refused}` : ""}`);
-    if (acts.some((act) => act.act === "adopted")) {
-      const run = runCompile(root);
-      lines.push(run.errors.length === 0 ? "compiled .house/generated/" : "compile refused: projections not updated");
-      lines.push(...run.findings.map((finding) => `${finding.level} [${finding.rule}] ${finding.message}`));
+    const { compiled, commit, message } = settleActs(root, items, acts, process.env);
+    if (compiled) {
+      lines.push(compiled.errors.length === 0 ? "compiled .house/generated/" : "compile refused: projections not updated");
+      lines.push(...compiled.findings.map((finding) => `${finding.level} [${finding.rule}] ${finding.message}`));
     }
+    if (commit !== null) lines.push(commitLine(commit, message));
     send(lines.join("\n"));
   };
 
@@ -379,9 +383,11 @@ export default function lampstand(pi: HostApi): void {
           await adoptHere(ctx, !argv.includes("--no-workspace"));
           return;
         }
+        // The operator typed this command, so it runs without the agent marker its own process carries.
+        const { LAMPSTAND_AGENT: _agent, ...operatorEnv } = process.env;
         let out = "";
         const sink = { write: (text: string) => (out += text) };
-        const code = await runCli(REGISTRY, argv, { stdout: sink, stderr: sink, env: process.env, cwd: ctx.cwd });
+        const code = await runCli(REGISTRY, argv, { stdout: sink, stderr: sink, env: operatorEnv, cwd: ctx.cwd });
         send(`${out.trimEnd()}${code === 0 ? "" : `\n(exit ${code})`}`);
       } catch (error) {
         if (!isLampstandError(error)) throw error;

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
+import { propose } from "../../core/lib/constitution/curate.js";
 import { runCompile } from "../../core/lib/constitution/run.js";
 import { renderRegion } from "../../core/lib/init/region.js";
 import { plantHouse } from "../u2/helpers.js";
@@ -64,7 +65,7 @@ test("below the version floor: one notice, and nothing else is registered", asyn
   assert.deepEqual(atFloor.events(), ["before_agent_start", "session_start", "session_stop", "tool_execution_end"]);
 });
 
-test("outside a house: dormant, one hint at most once, nothing injected", async (t) => {
+test("outside a house: dormant and silent, nothing injected", async (t) => {
   const dir = tempDir(t);
   isolateProcessEnv(t, dir);
   const host = await stubHost();
@@ -75,10 +76,23 @@ test("outside a house: dormant, one hint at most once, nothing injected", async 
   }
   await host.emit("tool_execution_end", { toolName: "write", isError: false, result: { details: { resolvedPath: join(dir, "a.txt") } } }, ctx);
   assert.equal(await host.emit("session_stop", { type: "session_stop" }, ctx), undefined);
-  assert.equal(notes.length, 1);
-  assert.equal(notes[0].level, "info");
-  assert.match(notes[0].text, /no house here/);
+  assert.deepEqual(notes, []);
   assert.deepEqual(host.sent, []);
+});
+
+test("the factory marks the agent's environment, and the operator's /lampstand adopt --ids still adopts a provision", async (t) => {
+  const root = compiledHouse(t);
+  delete process.env.LAMPSTAND_AGENT;
+  const host = await stubHost();
+  assert.equal(process.env.LAMPSTAND_AGENT, "omp");
+  const draft = join(root, "..", "commit-as-it-lands.md");
+  writeFileSync(draft, "# Commit as it lands\n\nCommit each piece of work when it is finished.\n");
+  assert.ok("path" in propose(root, "provision", draft, "a batch commit lost work", "2026-11-03"));
+
+  const { ctx } = session(root);
+  await host.commands.get("lampstand")?.handler("adopt --ids provision/commit-as-it-lands", ctx);
+  assert.match(host.sent.at(-1)?.message.content ?? "", /adopted provision\/commit-as-it-lands/);
+  assert.equal(process.env.LAMPSTAND_AGENT, "omp", "the command does not strip the marker from the agent's own process");
 });
 
 test("main session: the orientation is queued once for the next turn, and the router is appended once", async (t) => {

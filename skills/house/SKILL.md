@@ -38,10 +38,13 @@ A subagent gets the kernel and the reflexes for its host only.
 Run `lampstand <verb> --help` for flags; add `--json` for one machine-readable object.
 
 - **Work:** `task new|list|set|done`, `capture "<text>"`, `inbox new|list|set`, `decide new|resolve`,
-  `knowledge new|list`, `remind new|list|done`.
+  `knowledge new|list`, `remind new|list|done`. Pass long Markdown as `--body -` on stdin (`capture -` likewise), never
+  inside shell quotes: a backtick in double quotes runs as a command.
 - **Truth upkeep:** `status --orient`, `lint`, `relink <old> <new>` (after any move), `compile [--check]`.
 - **The constitution:** `propose principle|provision|reflex <file> --occasion "<what happened>"`, `adopt` (the
-  operator's act, item by item).
+  operator's act, item by item, committed). The file is `<slug>.md` (lowercase letters, digits, hyphens);
+  `propose <kind> --help` prints its minimal shape. A provision is `# Title`, a blank line, then the text; `propose`
+  adds `occasion` and `proposed` to the frontmatter itself.
 - **Pipelines:** `forge new|log|status` (see the orchestrate skill).
 - **Jobs:** `run <job>`, `run --status`, `tick`, `scheduler enable|disable|status` (the scheduler is off until the
   operator turns it on).
@@ -58,7 +61,8 @@ Run `lampstand <verb> --help` for flags; add `--json` for one machine-readable o
 4. **Ask first** before anything on the ask-first list in `house.toml` (by default: irreversible deletes, history
    rewrites, publishing, spending, messaging people, secrets leaving the machine, live systems). The list is the
    operator's; follow it even when the action looks harmless.
-5. **Never adopt for the operator, and never recommend in an adopt.** You may propose with an occasion; the operator
+5. **Never adopt for the operator, and never recommend in an adopt.** The CLI refuses principles and provisions from
+   your shell (`E_OPERATOR_ONLY`); only reflexes are yours to admit. You may propose with an occasion; the operator
    decides. Whoever is judged by a lens does not shape it.
 6. **Orientation shows only problems.** If it reports STALE, NOT_LANDED, REJECTED, a stale projection or a newer
    schema, deal with that before new work or tell the operator why not.

@@ -55,6 +55,7 @@ test("version-sync passes when all sources agree, including quoted YAML and a ma
     [agreeing, []],
     [agreeing, ["--tag", "v1.2.3"]],
     [quoted, []],
+    [{ ...agreeing, "CHANGELOG.md": "# Changelog\n\n## Unreleased\n\n- next\n\n## 1.2.3\n" }, []],
   ];
   for (const [files, args] of cases) {
     const { status, output } = run(plant(tempDir(t), "version-sync.js", files), args);
@@ -71,6 +72,8 @@ test("version-sync fails when any source disagrees or is missing", (t) => {
     "plugin.yaml version twice": { "plugin.yaml": "version: 1.2.3\nversion: 1.2.3\n" },
     "newest changelog heading differs": { "CHANGELOG.md": "# Changelog\n\n## 1.2.4\n\n## 1.2.3\n" },
     "changelog has no heading": { "CHANGELOG.md": "# Changelog\n" },
+    "only an Unreleased heading": { "CHANGELOG.md": "# Changelog\n\n## Unreleased\n" },
+    "Unreleased above a different version": { "CHANGELOG.md": "# Changelog\n\n## Unreleased\n\n## 1.2.4\n" },
   };
   for (const [name, override] of Object.entries(cases)) {
     const { status, output } = run(plant(tempDir(t), "version-sync.js", { ...agreeing, ...override }));
@@ -80,6 +83,9 @@ test("version-sync fails when any source disagrees or is missing", (t) => {
     const { status, output } = run(plant(tempDir(t), "version-sync.js", agreeing), ["--tag", tag]);
     assert.equal(status, 1, `--tag ${tag}: ${output}`);
   }
+  const unreleased = { ...agreeing, "CHANGELOG.md": "# Changelog\n\n## Unreleased\n\n## 1.2.3\n" };
+  const tagged = run(plant(tempDir(t), "version-sync.js", unreleased), ["--tag", "v1.2.3"]);
+  assert.equal(tagged.status, 1, `a release with an Unreleased heading: ${tagged.output}`);
 });
 
 test("clean-room passes on the real repository", () => {

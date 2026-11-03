@@ -4,6 +4,7 @@
 // host's own resolution rules (named beside each reader) and the environment, so a test moves them all by pointing
 // HOME, USERPROFILE, LOCALAPPDATA and HERMES_HOME at a temp directory.
 import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync, realpathSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { errorMessage, normalizeLf, stripBom } from "../io.js";
@@ -160,14 +161,23 @@ function strings(value) {
 }
 
 /**
- * The nearest `.omp` directory at or above `cwd`: OMP's anchor for project plugins and project settings.
+ * The nearest `.omp` directory at or above `cwd`: OMP's anchor for project plugins and project settings. Like OMP's
+ * project discovery (discovery/helpers.ts, getProjectDiscoveryCeilings), the walk never examines the home directory,
+ * the temp directory or anything above them, and the user's own config root is never a project's.
  * @param {string} cwd
+ * @param {string} home
+ * @param {string} userRoot  `~/.omp`, the user's config root
  */
-function projectOmpDir(cwd) {
-  for (let dir = cwd; ; dir = dirname(dir)) {
-    if (isDirectory(join(dir, ".omp"))) return join(dir, ".omp");
+function projectOmpDir(cwd, home, userRoot) {
+  /** @param {string} path */
+  const same = (path) => (process.platform === "win32" ? resolve(path).toLowerCase() : resolve(path));
+  const ceilings = new Set([home, tmpdir(), ...(process.platform === "win32" ? [] : ["/tmp", "/var/tmp"])].map(same));
+  for (let dir = resolve(cwd); !ceilings.has(same(dir)); dir = dirname(dir)) {
+    const candidate = join(dir, ".omp");
+    if (same(candidate) !== same(userRoot) && isDirectory(candidate)) return candidate;
     if (dirname(dir) === dir) return null;
   }
+  return null;
 }
 
 /** The OMP_FLOOR constant of the shipped OMP adapter, its single source. */
@@ -201,7 +211,7 @@ function ompFacts(env, cwd, run) {
   const xdgData = env.XDG_DATA_HOME;
   const pluginsRoot =
     process.platform !== "win32" && xdgData && isAbsolute(xdgData) && isDirectory(join(xdgData, "omp")) ? join(xdgData, "omp", "plugins") : join(root, "plugins");
-  const project = projectOmpDir(cwd);
+  const project = projectOmpDir(cwd, home, root);
 
   /** @type {Failure[]} */
   const unreadable = [];

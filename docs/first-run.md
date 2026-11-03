@@ -18,8 +18,10 @@ lampstand init ~/my-house
    you and the agent).
 6. **What always needs asking first,** and how the agent should speak on each channel you use.
 
-It then plants the house, starts a git repository if there is none, and compiles what your agent will load. Planting
-writes only missing files: run it again any time.
+It then plants the house, starts a git repository if there is none, compiles what your agent will load, and commits
+exactly what it planted as one commit, `Plant the house`; anything else you had staged stays out of it. If git has no
+name and email to sign with, the files stay uncommitted and `init` prints the command to commit them once you have set
+those. Planting writes only missing files: run it again any time.
 
 To plant without questions, write the answers to a file and pass `--answers answers.toml`. To start with no
 principles, add `--no-lattice`.
@@ -45,7 +47,9 @@ and names the fix for anything that is not.
 ## Adopt
 
 When the agent proposes a principle, a rule or an updated pack, it waits in `proposals/`. Run `lampstand adopt` to see
-each one verbatim with its size; adopt, edit, strike, or leave it for later.
+each one verbatim with its size; adopt, edit, strike, or leave it for later. What a run adopts or strikes (the record in
+`charter/record.md`, the moved proposal, the recompiled projections) is committed in one commit, `Adopt <kind>/<slug>`
+or `Strike <kind>/<slug>`, naming each item; when every item is left for later, nothing is committed.
 
 ## Turn things on
 

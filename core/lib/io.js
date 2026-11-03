@@ -1,6 +1,6 @@
 // @ts-check
 import { createHash, randomBytes } from "node:crypto";
-import { closeSync, fsyncSync, openSync, readFileSync, renameSync, rmSync, writeSync } from "node:fs";
+import { closeSync, fsyncSync, openSync, readFileSync, readSync, renameSync, rmSync, writeSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fail } from "./errors.js";
 
@@ -39,6 +39,35 @@ export function readText(path) {
     throw fail("E_IO", `cannot read: ${errorMessage(cause)}`, { path, cause });
   }
   return normalizeLf(stripBom(raw));
+}
+
+/**
+ * Everything on standard input as UTF-8 text, without a BOM and with one trailing line break removed: what a pipe
+ * or here-document delivers is the text plus the newline that ended it. Blocks until the stream ends.
+ * @returns {string}
+ */
+export function readStdin() {
+  /** @type {Buffer[]} */
+  const chunks = [];
+  const chunk = Buffer.alloc(64 * 1024);
+  for (;;) {
+    let n;
+    try {
+      n = readSync(0, chunk, 0, chunk.length, null);
+    } catch (cause) {
+      const code = /** @type {NodeJS.ErrnoException} */ (cause).code;
+      // A non-blocking pipe with nothing yet: wait a moment and ask again. A closed stream reads as the end.
+      if (code === "EAGAIN") {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+        continue;
+      }
+      if (code === "EOF") break;
+      throw fail("E_IO", `cannot read standard input: ${errorMessage(cause)}`, { cause });
+    }
+    if (n === 0) break;
+    chunks.push(Buffer.from(chunk.subarray(0, n)));
+  }
+  return stripBom(Buffer.concat(chunks).toString("utf8")).replace(/\r?\n$/, "");
 }
 
 /**

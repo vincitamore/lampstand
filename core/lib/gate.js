@@ -13,10 +13,11 @@ const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
 /**
  * The house-relative paths a session changed, read from git rather than from the host's tool events, so work recorded
- * through lampstand verbs, the shell or a subagent counts too. Tracked changes are everything that differs from the
- * commit the session started at (committed since, or still in the working tree); untracked files count when they
- * were modified after the session began. Never reads `git status`. Returns null when git cannot answer, and the
- * caller falls back to the paths it observed itself.
+ * through lampstand verbs, the shell or a subagent counts too. Everything committed since the session began counts.
+ * A change still in the working tree, tracked or not, counts when its file was modified after the session began, so
+ * work an earlier session left uncommitted is not charged to this one. A deleted file has no time to read and counts
+ * whenever it is uncommitted. Never reads `git status`. Returns null when git cannot answer, and the caller falls back
+ * to the paths it observed itself.
  * @param {string} root
  * @param {{ since: string, sinceMs: number }} session  the commit at session start ("" before the first commit) and
  *   the session's start time in epoch milliseconds
@@ -25,18 +26,31 @@ const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 export function sessionChanges(root, session) {
   /** @param {string[]} args */
   const git = (...args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8", maxBuffer: 256 << 20 });
+  /** @param {import("node:child_process").SpawnSyncReturns<string>} result */
+  const names = (result) => result.stdout.split("\0").filter(Boolean);
   const base = session.since === "" ? EMPTY_TREE : session.since;
-  const tracked = git("diff", "--name-only", "--relative", "-z", base, "--");
+  const head = git("rev-parse", "--verify", "--quiet", "HEAD");
+  const now = head.status === 0 ? head.stdout.trim() : "";
+  const committed = now === "" || now === session.since ? null : git("diff", "--name-only", "--relative", "-z", base, now, "--");
+  const uncommitted = git("diff", "--name-only", "--relative", "-z", now === "" ? EMPTY_TREE : now, "--");
   const untracked = git("ls-files", "--others", "--exclude-standard", "-z");
-  if (tracked.error || tracked.status !== 0 || untracked.error || untracked.status !== 0) return null;
-  const fresh = untracked.stdout.split("\0").filter(Boolean).filter((rel) => {
+  const failed = [committed, uncommitted, untracked].some((result) => result !== null && (result.error || result.status !== 0));
+  if (head.error || failed) return null;
+  /** @param {string} rel @param {boolean} deletedCounts */
+  const touched = (rel, deletedCounts) => {
     try {
       return statSync(join(root, rel)).mtimeMs >= session.sinceMs;
     } catch {
-      return false;
+      return deletedCounts;
     }
-  });
-  return [...new Set([...tracked.stdout.split("\0").filter(Boolean), ...fresh])];
+  };
+  return [
+    ...new Set([
+      ...(committed === null ? [] : names(committed)),
+      ...names(uncommitted).filter((rel) => touched(rel, true)),
+      ...names(untracked).filter((rel) => touched(rel, false)),
+    ]),
+  ];
 }
 
 /** @typedef {"off" | "remind" | "block"} GateMode */

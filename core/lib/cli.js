@@ -21,6 +21,7 @@ import { ERROR_CODES, LampstandError, fail, isLampstandError } from "./errors.js
  *   summary: string,
  *   flags?: Record<string, FlagSpec>,
  *   args?: { min: number, max: number, usage: string },
+ *   more?: (args: string[]) => string,
  *   run: (context: VerbContext) => VerbResult | Promise<VerbResult>,
  * }} Verb
  * @typedef {{ write(text: string): unknown }} Sink
@@ -67,13 +68,14 @@ export class Registry {
   }
 }
 
-/** @param {Verb} verb */
-function verbUsage(verb) {
+/** @param {Verb} verb @param {string[]} [args]  the positional arguments given with --help, which `more` may use */
+function verbUsage(verb, args = []) {
   const flags = Object.entries(verb.flags ?? {}).map(
     ([name, spec]) => `  --${name}${spec.type === "string" ? " <value>" : ""}  ${spec.summary}`,
   );
   flags.push("  --json  print one JSON object whose first key is ok");
-  return `usage: lampstand ${verb.name}${verb.args ? ` ${verb.args.usage}` : ""} [flags]\n\n${verb.summary}\n\nflags:\n${flags.join("\n")}`;
+  const more = verb.more ? `\n\n${verb.more(args)}` : "";
+  return `usage: lampstand ${verb.name}${verb.args ? ` ${verb.args.usage}` : ""} [flags]\n\n${verb.summary}\n\nflags:\n${flags.join("\n")}${more}`;
 }
 
 /**
@@ -164,7 +166,8 @@ export async function runCli(registry, argv, io) {
     }
     const verb = parsed.verb;
     if (parsed.help) {
-      emit(io, json, { ok: true, usage: verbUsage(verb) }, verbUsage(verb));
+      const usage = verbUsage(verb, parsed.args);
+      emit(io, json, { ok: true, usage }, usage);
       return 0;
     }
     const result = await verb.run({

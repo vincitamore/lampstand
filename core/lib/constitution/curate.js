@@ -5,6 +5,7 @@
 // from being proposed again until its text changes.
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { fail } from "../errors.js";
 import { parseFrontmatter } from "../frontmatter.js";
 import { atomicWrite, contentHash, readText } from "../io.js";
 import { chars, surfaceOf } from "./budgets.js";
@@ -161,6 +162,17 @@ export function adoptItem(root, item, date) {
 }
 
 /**
+ * The house-relative paths an act on `item` writes, moves or deletes: the record, the proposal's old place and, for
+ * an adoption, its new one.
+ * @param {ProposedItem} item
+ * @param {"adopted" | "struck"} act
+ * @returns {string[]}
+ */
+export function actPaths(item, act) {
+  return act === "adopted" ? [RECORD_PATH, item.path, `${KIND_DIRS[item.kind].adopted}/${item.slug}.md`] : [RECORD_PATH, item.path];
+}
+
+/**
  * Strikes one proposal: records its body hash and removes it.
  * @param {string} root
  * @param {ProposedItem} item
@@ -169,6 +181,22 @@ export function adoptItem(root, item, date) {
 export function strikeItem(root, item, date) {
   appendRecord(root, { date, act: "struck", kind: item.kind, slug: item.slug, hash: item.hash });
   rmSync(full(root, item.path), { force: true });
+}
+
+/**
+ * The file name a proposal must have, checked before anything is read or written: a slug of lowercase letters, digits
+ * and hyphens, then `.md`. A refusal names the nearest valid name: extra dots (`x.draft.md`) are cut, and anything
+ * else outside the slug's characters becomes a hyphen.
+ * @param {string} name  the draft's base name
+ * @param {string} path  named in the refusal
+ */
+function checkProposalName(name, path) {
+  if (/^[a-z0-9][a-z0-9-]*\.md$/.test(name)) return;
+  const stem = name.replace(/\.md$/i, "");
+  const slug = (/** @type {string} */ text) => text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const suggestion = slug(stem.split(".")[0]) || slug(stem);
+  const hint = suggestion === "" ? "name it <slug>.md" : `try ${suggestion}.md`;
+  throw fail("E_SCHEMA", `the draft's file name must be lowercase letters, digits and hyphens before .md, found ${JSON.stringify(name)}; ${hint}`, { path });
 }
 
 /**
@@ -182,8 +210,9 @@ export function strikeItem(root, item, date) {
  * @returns {{ path: string } | { refused: string }}
  */
 export function propose(root, kind, draftPath, occasion, date) {
-  const parsed = parseFrontmatter(readText(draftPath), draftPath);
   const name = draftPath.split(/[\\/]/).pop() ?? "";
+  checkProposalName(name, draftPath);
+  const parsed = parseFrontmatter(readText(draftPath), draftPath);
   const destRel = `${KIND_DIRS[kind].proposals}/${name}`;
   const dest = full(root, destRel);
   /** @type {Frontmatter} */

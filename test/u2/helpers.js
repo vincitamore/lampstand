@@ -101,7 +101,7 @@ export function reflexFile(id, scope, extra = {}) {
 // The CLI runs under Node: that is how Hermes spawns it. Under `bun test` the same file still spawns node.
 const NODE = process.versions.bun ? "node" : process.execPath;
 
-/** @param {string[]} args @param {{ cwd: string, env: NodeJS.ProcessEnv }} options */
+/** @param {string[]} args @param {{ cwd: string, env: NodeJS.ProcessEnv, input?: string }} options */
 export function lampstand(args, options) {
   const result = spawnSync(NODE, [BIN, ...args], { ...options, encoding: "utf8" });
   if (result.error) throw result.error;
@@ -125,4 +125,24 @@ export function git(cwd, args) {
   });
   if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
   return result.stdout;
+}
+
+/**
+ * An environment in which git signs commits as a fixed identity (or, with `identity: false`, has none and refuses to
+ * guess one), with no user or system config.
+ * @param {string} dir
+ * @param {boolean} identity
+ * @returns {NodeJS.ProcessEnv}
+ */
+export function gitEnv(dir, identity) {
+  /** @type {NodeJS.ProcessEnv} */
+  const env = { ...isolatedEnv(dir), GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: join(dir, "no-such-gitconfig"), HOME: dir, USERPROFILE: dir, XDG_CONFIG_HOME: dir };
+  for (const key of ["GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL", "EMAIL"]) delete env[key];
+  if (identity) return { ...env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+  return { ...env, GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "user.useConfigOnly", GIT_CONFIG_VALUE_0: "true" };
+}
+
+/** The paths a commit touched, sorted. @param {string} cwd @param {string} [rev] */
+export function commitNames(cwd, rev = "HEAD") {
+  return git(cwd, ["show", "--name-only", "--no-renames", "--format=", rev]).split("\n").filter(Boolean).sort();
 }

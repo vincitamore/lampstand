@@ -35,4 +35,4 @@ and also listed under `extensions:` in your OMP config), and files in your own O
 - Before each request, it adds the router to a main session and the worker to a subagent, once each.
 - Before the session ends, it runs the maintenance gate.
 
-Outside a house it does nothing beyond one line saying so.
+Outside a house it does nothing and says nothing; `/lampstand status` reports that there is no house there.

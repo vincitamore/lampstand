@@ -225,10 +225,8 @@ class Adapter:
         except LampstandError as error:
             return {"context": f"lampstand: {error}"}
         if found.root is None:
-            return {
-                "context": f"lampstand: no house resolves from {cwd}, so nothing is loaded; set HOUSE_ROOT or plant "
-                "one with `lampstand init`."
-            }
+            # Outside a house the plugin is silent: a global install would otherwise speak in every session.
+            return None
         notices, stale = self._kernel_notices(found.root, cwd)
         orientation = ""
         try:
@@ -394,6 +392,9 @@ def _tool_result(ok: bool, **fields: Any) -> str:
 
 
 def register(ctx: Any) -> None:
+    # Marks the agent's environment: Hermes's terminal tool passes through every name that is not a credential, and
+    # `lampstand adopt` refuses principles and provisions from a shell that carries this one.
+    os.environ["LAMPSTAND_AGENT"] = "hermes"
     adapter = Adapter(ctx)
     ctx.register_system_prompt_section(SECTION_ID, adapter.section, max_chars=SECTION_MAX_CHARS)
     ctx.register_hook("pre_llm_call", adapter.pre_llm_call)

@@ -50,11 +50,13 @@ without a host limit on OMP.
 ## Plant, adopt, propose
 
 - **Plant:** `lampstand init` asks six questions and plants the house. It writes only files that are missing, so you
-  can run it again safely.
+  can run it again safely. What it plants is committed as `Plant the house`.
 - **Adopt:** proposed principles and rules wait in `proposals/` until you adopt them with `lampstand adopt`, one at a
-  time, shown verbatim with their size. The agent never adopts on your behalf.
+  time, shown verbatim with their size. The agent never adopts on your behalf. Each run commits exactly the files it
+  changed (the record, the moved proposal, the projections) as `Adopt <kind>/<slug>` or `Strike <kind>/<slug>`. The CLI refuses principles and provisions from an agent's shell (the OMP and Hermes
+  plugins mark it with `LAMPSTAND_AGENT`); you adopt them in your own terminal or with `/lampstand adopt`.
 - **Propose:** when something happens that calls for a new principle, rule or habit, the agent files it with
-  `lampstand propose` and the occasion that called for it.
+  `lampstand propose` and the occasion that called for it. `lampstand propose <kind> --help` shows the file to write.
 
 ## The maintenance gate
 
