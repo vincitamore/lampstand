@@ -46,10 +46,13 @@ jobs:
     timeout-minutes: 30
     env:
       HERMES_REPO: https://github.com/NousResearch/hermes-agent
-      HERMES_HOME: ${{ runner.temp }}/hermes-home
-      HERMES_DIR: ${{ runner.temp }}/hermes-agent
     steps:
       - uses: actions/checkout@v5
+      # The runner context is not available in a job's env, so the temp paths are set by a step.
+      - name: temp paths for the Hermes install
+        run: |
+          echo "HERMES_HOME=$RUNNER_TEMP/hermes-home" >> "$GITHUB_ENV"
+          echo "HERMES_DIR=$RUNNER_TEMP/hermes-agent" >> "$GITHUB_ENV"
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
