@@ -1,4 +1,5 @@
 // @ts-check
+import { localDate } from "../../core/lib/org/markdown.js";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -58,7 +59,7 @@ test("lampstand tick is silent on success and does nothing while the scheduler m
   const off = makeHouse(join(dir, "off"), `[jobs.often]\nargv = ${jobArgv()}\nstale_hours = 1\nevery = "1m"\n`);
   const result = lampstand(["tick", "--json", "--house", off.root], { cwd: dir, env: off.env });
   assert.equal(result.status, 0);
-  assert.deepEqual(envelope(result.stdout), { ok: true, house: off.root, active: false, ran: [], doctor: "absent", failures: [], capture: null });
+  assert.deepEqual(envelope(result.stdout), { ok: true, house: off.root, active: false, ran: [], doctor: "absent", failures: [], capture: null, text: "" });
   assert.equal(query(off, "SELECT count(*) AS n FROM job_runs")[0].n, 0);
 });
 
@@ -73,7 +74,7 @@ test("a failing tick writes one capture; the same failure again writes none; aft
   assert.match(first, /^\d{8}-\d{4}-tick-failure\.md$/);
   const text = readFileSync(join(made.root, "inbox", "captures", first), "utf8");
   const parsed = parseFrontmatter(text, first);
-  assert.deepEqual(parsed.frontmatter, { kind: "capture", created: new Date().toISOString().slice(0, 10), source: "lampstand tick" });
+  assert.deepEqual(parsed.frontmatter, { kind: "capture", created: localDate(), source: "lampstand tick" });
   assert.match(parsed.body, /- job flaky: failed: exited with 2/);
 
   const again = lampstand(["tick", "--json"], { cwd: made.root, env: made.env });

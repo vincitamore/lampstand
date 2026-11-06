@@ -5,24 +5,29 @@
   </picture>
 </p>
 
-lampstand gives your coding agent a house: a git repository you own that holds the principles and rules it works
-under, its tasks, decisions and knowledge, and the machinery that keeps them true. It installs as a plugin into
-[OMP](https://github.com/can1357/oh-my-pi) and [Hermes Agent](https://github.com/NousResearch/hermes-agent). Every
-session in the house starts from the same principles; every subagent gets a short kernel of them; and the work stays in
-plain files you can read, diff and keep.
+**lampstand turns one Hermes into a team that remembers who it works for.** Plant a house (a git repository you own)
+and every chat started in it works under the same written principles and rules, keeps one shared record of tasks,
+decisions and knowledge, and can wake the other chats, or be woken by them, through shared rooms, including from your
+phone. Nothing becomes a rule until you adopt it, and every change is a commit you can read, diff and keep.
+
+It installs as a plugin into [Hermes Agent](https://github.com/NousResearch/hermes-agent) and
+[OMP](https://github.com/can1357/oh-my-pi).
 
 ## What it does
 
-| You get | How | When it holds |
+| You get | How | Where |
 |---|---|---|
-| One agent, continuous across sessions and model changes | the house's files are compiled into what each session loads at start: a kernel of your principles, then the full text for main sessions | always, inside a house |
-| Subagents that carry your principles at a fraction of the main context | a worker projection: the kernel plus the habits scoped to that host | OMP subagents; Hermes through `lampstand_delegate` |
-| Your work in plain files you own | tasks, decisions, investigations, knowledge and reminders as Markdown with frontmatter, moved and linked by `lampstand` verbs | always |
-| A check before a session ends | the maintenance gate lists what the session owes the house (a task updated, current state written down) and can block until it is done | OMP; Hermes where it offers `pre_verify` |
-| Fixed jobs that tell you only when one did not land | declared outputs, verified commits, one OS scheduler entry per house | the scheduler module turned on; the machine awake at the scheduled time |
-| Sessions woken by messages in shared rooms | [agora](https://github.com/vincitamore/agora) rooms, with an author allowlist checked before any wake | agora installed; OMP |
+| Every chat starts from the same house | the house's files compile into a short kernel (purpose, a line per principle, what always needs asking first) loaded at the start of every session; the first turn adds what is open now | every session inside a house |
+| The house as native tools | tasks, inbox, decisions, knowledge, reminders and proposals as plain Markdown, each change its own git commit | Hermes tools and `/lampstand`; the `lampstand` CLI anywhere |
+| A cockpit | the Hermes Desktop House page: five lamps for the house's health, work, inbox, knowledge, the constitution with adopt and strike, rooms and rhythm | Hermes Desktop |
+| Rules only you enact | the agent drafts principles, rules and habits with the occasion that called for each; adopting a principle or a rule is refused from an agent's shell | always |
+| Subagents that carry your principles | a worker projection: the kernel plus the habits scoped to that host, at a fraction of the main context | Hermes `lampstand_delegate`; OMP subagents |
+| Chats that wake each other | [agora](https://github.com/vincitamore/agora) rooms: each chat listens under its own name, answers in the room, is never woken by itself, and a hop cap stops loops | Hermes and OMP, with agora installed |
+| The room on your phone | `/lampstand relay <room>` in a Telegram, Discord, Slack or other Hermes chat: what you type goes into the room, and Hermes tells you what the room says | Hermes messaging |
+| A check before a turn ends | the maintenance gate lists what the session owes the house (a task updated, state written down) | Hermes and OMP |
+| Fixed jobs that tell you only when one did not land | declared outputs, verified commits, one OS scheduler entry per house | the scheduler module turned on |
 
-Parallel work is your host's own feature (OMP subagents and background jobs, Hermes delegation); lampstand gives each
+Parallel work is your host's own feature (Hermes delegation, OMP subagents and background jobs); lampstand gives each
 worker the right context and keeps their results in the house.
 
 ## Quick start
@@ -30,29 +35,40 @@ worker the right context and keeps their results in the house.
 lampstand needs Node 22.13 or newer (or Bun) and git.
 
 ```sh
-# OMP
-omp plugin install "github:vincitamore/lampstand#v0.2.2"
-
-# Hermes (asks before enabling; lampstand has no Node dependencies, so answer no to that question)
+# Hermes (say yes to enabling; lampstand has no Node dependencies, so answer no to that question)
 hermes plugins install vincitamore/lampstand
 
-# the CLI
-npm install -g "github:vincitamore/lampstand#v0.2.2"
+# OMP
+omp plugin install "github:vincitamore/lampstand#v0.3.0"
+
+# the CLI on your own PATH
+npm install -g "github:vincitamore/lampstand#v0.3.0"
 
 # plant a house
 lampstand init ~/my-house
 ```
 
-`init` asks six questions (where the house lives, its name, who has care of it, what the work is for, how rules are
-made, which actions always need asking first), plants the house, and compiles what your agent will load. Open a
-session inside the folder and the agent starts from your house.
+`init` asks where the house lives, its name, who has care of it, what the work is for, how rules are made and which
+actions always need asking first, then whether to plant the default principles. It plants the house and compiles what
+your agent will load. Start a chat in the folder (`cd ~/my-house`, or pick it as the chat's folder in Hermes Desktop)
+and the agent starts from your house. [Install on Hermes](docs/install-hermes.md) covers the House page, rooms and the
+phone relay.
 
 ## The principles
 
-Every house starts from a set of principles unless you decline them with `--no-lattice`: the lattice, thirteen lenses
-for judging work (inversion, single source, structural correctness, coherence, and others), each with the failure mode
-it guards against. `init` plants it as your own copy. Edit it, strike what does not fit, or add your own; new versions
-of the pack arrive as proposals and never overwrite your copy. The text is public domain (CC0).
+Every house starts from a set of principles unless you decline them with `--no-lattice`: the lattice, thirteen
+principles for judging work, drawn from classical and Christian philosophy and from engineering practice. Each names
+the failure it guards against, and each gives every session one line to carry. Two of them, as a session loads them:
+
+> **Structural Correctness Over Functional Adequacy.** Be right over the operations the structure must support over
+> time, not the sample tested; name that space.
+>
+> **Primitives Over Opinions.** Expose primitives and let the consumer compose; ship defaults on top of the
+> primitives, never as them.
+
+`init` explains the pack before it asks, then plants it as your own copy. Edit it, strike what does not fit, or add
+your own; new versions of the pack arrive as proposals and never overwrite your copy. The text is public domain
+(CC0).
 
 ## How rules are made
 

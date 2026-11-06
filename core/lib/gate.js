@@ -6,6 +6,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
+import { AGENTS_FILE } from "./init/region.js";
 import { gateModeOf, readHouseToml } from "./org/schema.js";
 
 /** git's empty tree, the base for a session that started before the house's first commit. */
@@ -53,6 +54,24 @@ export function sessionChanges(root, session) {
   ];
 }
 
+/**
+ * The house-relative paths changed in the working tree and not yet committed, tracked or not; null when git cannot
+ * answer (no repository). Never reads `git status`.
+ * @param {string} root
+ * @returns {string[] | null}
+ */
+export function uncommittedPaths(root) {
+  /** @param {string[]} args */
+  const git = (...args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8", maxBuffer: 256 << 20 });
+  const head = git("rev-parse", "--verify", "--quiet", "HEAD");
+  if (head.error) return null;
+  const base = head.status === 0 ? head.stdout.trim() : EMPTY_TREE;
+  const tracked = git("diff", "--name-only", "--relative", "-z", base, "--");
+  const untracked = git("ls-files", "--others", "--exclude-standard", "-z");
+  if ([tracked, untracked].some((result) => result.error || result.status !== 0)) return null;
+  return [...new Set([...tracked.stdout.split("\0"), ...untracked.stdout.split("\0")].filter(Boolean))];
+}
+
 /** @typedef {"off" | "remind" | "block"} GateMode */
 /** @typedef {{ id: string, owed: string, folder: string, triggers: string[] }} Obligation */
 /** @typedef {{ version: number, record_folders: string[], obligations: Obligation[] }} Maintenance */
@@ -65,6 +84,12 @@ export const MAINTENANCE = /** @type {Maintenance} */ (
 
 /** Trigger matching any changed path outside the record folders and the other triggers, in or out of the house. */
 const WORK = "work";
+
+/**
+ * Files the compiler writes outside .house/generated/ (the house's AGENTS.md region). A compile rewrites them, so a
+ * change to one is the projection being refreshed, never work that owes a task or a state note.
+ */
+const GENERATED_SURFACES = Object.freeze([AGENTS_FILE]);
 
 /**
  * A changed path as the gate sees it: house-relative with `/`, or null for a path outside the house. Relative input
@@ -99,7 +124,13 @@ export function evaluateGate(root, changed, mode, maintenance = MAINTENANCE) {
   // task and state record, so only a path nothing names is work.
   const named = maintenance.obligations.flatMap((obligation) => obligation.triggers.filter((trigger) => trigger !== WORK));
   /** @param {string | null} rel */
-  const isWork = (rel) => rel === null || !(maintenance.record_folders.some((folder) => matches(rel, folder)) || named.some((trigger) => matches(rel, trigger)));
+  const isWork = (rel) =>
+    rel === null ||
+    !(
+      maintenance.record_folders.some((folder) => matches(rel, folder)) ||
+      named.some((trigger) => matches(rel, trigger)) ||
+      GENERATED_SURFACES.includes(rel)
+    );
   /** @type {Owed[]} */
   const owed = [];
   for (const obligation of maintenance.obligations) {

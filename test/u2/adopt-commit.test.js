@@ -174,3 +174,39 @@ test("propose finalizes a draft already written at its destination, and still re
   assert.match(envelope(again.stdout).refused, /already proposed/);
   assert.equal(readFileSync(join(s.root, inPlace), "utf8"), text, "the filed proposal is untouched");
 });
+
+test("adopt rolls back and commits nothing when the compile after it refuses, naming the file", (t) => {
+  const s = setup(t);
+  proposeAndCommit(s, "reflex", "read-first.md", "a stale anchor");
+  // A proposal written past propose's checks (by hand, or before they existed): the compiler rejects it once adopted.
+  plant(s.root, { "proposals/reflexes/no-trigger.md": '---\nscope: "behavioral"\nsummary: "x"\noccasion: "y"\nproposed: "2026-11-01"\n---\nx\n' });
+  git(s.root, ["add", "-A"]);
+  git(s.root, ["commit", "-q", "-m", "hand proposal"]);
+  const before = git(s.root, ["rev-parse", "HEAD"]).trim();
+  const record = readFileSync(join(s.root, "charter", "record.md"), "utf8");
+
+  const result = s.run(["adopt", "--ids", "reflex/no-trigger", "--strike", "reflex/read-first", "--json"]);
+  assert.equal(result.status, 1);
+  const value = envelope(result.stdout);
+  assert.equal(value.ok, false);
+  assert.equal(value.rolledBack, true);
+  assert.equal(value.commit, null);
+  assert.deepEqual(value.acts.map((/** @type {any} */ act) => act.act), ["rolled back", "rolled back"]);
+  assert.match(value.text, /not adopted: the compile after it refused, so the adoption was undone and nothing was committed; correct reflexes\/no-trigger\.md and adopt again/);
+  assert.equal(git(s.root, ["rev-parse", "HEAD"]).trim(), before, "no commit");
+  assert.equal(git(s.root, ["status", "--porcelain"]).trim(), "", "the tree is as it was");
+  assert.equal(readFileSync(join(s.root, "charter", "record.md"), "utf8"), record);
+  assert.ok(existsSync(join(s.root, "proposals", "reflexes", "no-trigger.md")));
+  assert.ok(existsSync(join(s.root, "proposals", "reflexes", "read-first.md")), "the strike in the same run is undone too");
+  assert.ok(!existsSync(join(s.root, "reflexes", "no-trigger.md")));
+});
+
+test("adopt --ids shows only the named items, not every proposal", (t) => {
+  const s = setup(t);
+  proposeAndCommit(s, "principle", "stewardship.md", "the house drifted");
+  proposeAndCommit(s, "reflex", "read-first.md", "a stale anchor");
+  const result = s.run(["adopt", "--ids", "reflex/read-first"]);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /=== reflex\/read-first/);
+  assert.doesNotMatch(result.stdout, /principle\/stewardship/);
+});

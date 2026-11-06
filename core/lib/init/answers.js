@@ -230,7 +230,7 @@ export async function askAnswers(talk, options) {
   const file = { name, operator, co_owners: coOwners, purpose, charter: /** @type {Answers["charter"]} */ (charter), ask_first: askFirst, ask_first_defaults: defaults, channel_manners: channelManners };
   if (!options.noLattice) {
     talk.show(
-      "\nPrinciples. The lattice is a pack of thirteen principles that lampstand can copy into principles/lattice.md as your own adopted copy, yours from then on to edit or strike; it needs the large budget profile, which init then sets. Or start with no principles and adopt your own later.",
+      "\nPrinciples. The lattice is a pack of thirteen principles for judging work, drawn from classical and Christian philosophy and from engineering practice: inversion, single source, structural correctness over passing the test, logical coherence, primitives over opinions and others, each with the failure it guards against. Every session in the house carries one line of each. lampstand can copy it into principles/lattice.md as your own adopted copy, yours from then on to edit or strike; it needs the large budget profile, which init then sets. Or start with no principles and adopt your own later.",
     );
     const reply = (await talk.ask("Plant the lattice? [Y/n]: ")).trim().toLowerCase();
     file.lattice = !(reply === "n" || reply === "no");

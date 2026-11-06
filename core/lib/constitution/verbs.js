@@ -1,6 +1,7 @@
 // @ts-check
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { commitLine, commitOnly } from "../commit.js";
 import { fail } from "../errors.js";
@@ -105,6 +106,9 @@ export const compileVerb = {
 export async function adoptInteractively(root, talk, date) {
   /** @type {{ id: string, act: string, refused?: string }[]} */
   const acts = [];
+  // Taken before any act, so settleActs can undo the run when the compile after it refuses, whichever host called.
+  const snapshot = snapshotActs(root, listAllProposals(root));
+  SNAPSHOTS.set(acts, snapshot);
   for (const id of listAllProposals(root).map((item) => item.id)) {
     for (;;) {
       const item = listAllProposals(root).find((candidate) => candidate.id === id);
@@ -115,6 +119,8 @@ export async function adoptInteractively(root, talk, date) {
         acts.push({ id, act: "later" });
         break;
       }
+      // The proposal as it stands now, after any edit the operator made in this run, is what an undo restores.
+      if (["a", "adopt", "s", "strike"].includes(answer)) snapshot.set(item.path, Buffer.from(item.text, "utf8"));
       if (answer === "a" || answer === "adopt") {
         const refused = adoptAny(root, item, date);
         acts.push(refused === null ? { id, act: "adopted" } : { id, act: "refused", refused });
@@ -139,17 +145,27 @@ export async function adoptInteractively(root, talk, date) {
 /**
  * What follows a run of adopt acts: recompile after an adoption, then commit exactly what the run wrote (the record,
  * each moved proposal, the projections) in one commit. Nothing is committed when every item was left for later or
- * refused.
+ * refused. When the compile after an adoption refuses, the whole run is undone from `before` (the files the acts
+ * touched, as they stood before it) and nothing is committed: an adopted item the compiler rejects would otherwise be
+ * committed into a house whose projections can no longer be rebuilt.
  * @param {string} root
  * @param {ProposedItem[]} items  the proposals as they stood before the run
  * @param {{ id: string, act: string }[]} acts
  * @param {NodeJS.ProcessEnv} env
+ * @param {Snapshot} [before]  from snapshotActs, taken before the acts ran; adoptInteractively's own is used when absent
  */
-export function settleActs(root, items, acts, env) {
+export function settleActs(root, items, acts, env, before = SNAPSHOTS.get(acts)) {
   const adopted = acts.filter((act) => act.act === "adopted");
   const struck = acts.filter((act) => act.act === "struck");
   // Proposals and the record are not compiler inputs, so only an adoption makes the projections stale.
   const compiled = adopted.length > 0 ? runCompile(root) : null;
+  if (compiled !== null && compiled.errors.length > 0 && before !== undefined) {
+    restoreSnapshot(root, before);
+    for (const act of acts) {
+      if (act.act === "adopted" || act.act === "struck") act.act = "rolled back";
+    }
+    return { compiled, commit: null, message: "", rolledBack: true };
+  }
   const byId = new Map(items.map((item) => [item.id, item]));
   /** @type {string[]} */
   const paths = [];
@@ -161,7 +177,43 @@ export function settleActs(root, items, acts, env) {
     .filter((part) => part !== "")
     .join("; ");
   const commit = paths.length === 0 ? null : commitOnly(root, paths, message, env);
-  return { compiled, commit, message };
+  return { compiled, commit, message, rolledBack: false };
+}
+
+/** @typedef {Map<string, Buffer | null>} Snapshot  house-relative path to its bytes before a run, null when absent */
+
+/** The snapshot adoptInteractively took for the acts list it returned. @type {WeakMap<object, Snapshot>} */
+const SNAPSHOTS = new WeakMap();
+
+/**
+ * The bytes of every file an adopt or strike of any of `items` could write, move or delete.
+ * @param {string} root
+ * @param {ProposedItem[]} items
+ * @returns {Snapshot}
+ */
+export function snapshotActs(root, items) {
+  /** @type {Snapshot} */
+  const out = new Map();
+  for (const item of items) {
+    for (const rel of [...actPathsAny(item, "adopted"), ...actPathsAny(item, "struck")]) {
+      if (out.has(rel)) continue;
+      const path = join(root, ...rel.split("/"));
+      out.set(rel, existsSync(path) ? readFileSync(path) : null);
+    }
+  }
+  return out;
+}
+
+/** Puts every file of `snapshot` back as it was. @param {string} root @param {Snapshot} snapshot */
+function restoreSnapshot(root, snapshot) {
+  for (const [rel, bytes] of snapshot) {
+    const path = join(root, ...rel.split("/"));
+    if (bytes === null) rmSync(path, { force: true });
+    else {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, bytes);
+    }
+  }
 }
 
 /** @param {NodeJS.ProcessEnv} env @param {import("node:readline/promises").Interface} rl @returns {Conversation} */
@@ -185,6 +237,7 @@ export const adoptVerb = {
   flags: {
     ...WORKSPACE_FLAGS,
     ids: { type: "string", summary: "adopt exactly these items, comma-separated, without asking: <kind>/<slug>, or update/<path> for an update to a planted file (update/principles/lattice.md)" },
+    strike: { type: "string", summary: "strike exactly these items, comma-separated, without asking (same ids as --ids); a struck item is recorded and its proposal moved aside" },
   },
   async run(context) {
     const root = houseRoot(context);
@@ -192,11 +245,16 @@ export const adoptVerb = {
     const items = listAllProposals(root);
     /** @type {{ id: string, act: string, refused?: string, code?: string }[]} */
     let acts = [];
+    /** @type {Snapshot | undefined} */
+    let before;
     const shown = [];
-    const ids = typeof context.flags.ids === "string" ? context.flags.ids.split(",").map((id) => id.trim()).filter((id) => id !== "") : null;
+    /** @param {unknown} flag */
+    const list = (flag) => (typeof flag === "string" ? flag.split(",").map((id) => id.trim()).filter((id) => id !== "") : null);
+    const ids = list(context.flags.ids);
+    const strikes = list(context.flags.strike);
     // An agent's shell never gets the interactive loop: answering it would be the agent adopting for the operator.
     const agent = isAgentShell(context.env);
-    const interactive = ids === null && !agent && !context.json && process.stdin.isTTY === true && process.stdout.isTTY === true;
+    const interactive = ids === null && strikes === null && !agent && !context.json && process.stdin.isTTY === true && process.stdout.isTTY === true;
 
     if (interactive) {
       const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -206,30 +264,60 @@ export const adoptVerb = {
         rl.close();
       }
     } else {
-      for (const item of items) shown.push(`=== ${item.id} (${item.path})\n${item.text}${item.text.endsWith("\n") ? "" : "\n"}--- ${sizeLine(item)}`);
-      if (ids !== null) {
-        const byId = new Map(items.map((item) => [item.id, item]));
-        const unknown = ids.filter((id) => !byId.has(id));
-        if (unknown.length > 0) throw fail("E_USAGE", `no proposed item ${unknown.join(", ")}; proposed: ${items.map((item) => item.id).join(", ") || "none"}`);
-        for (const id of ids) {
+      const named = [...(ids ?? []), ...(strikes ?? [])];
+      // With items named, only those are shown: the rest are not this run's business. With none, every proposal is.
+      for (const item of items) {
+        if (named.length === 0 || named.includes(item.id)) shown.push(`=== ${item.id} (${item.path})\n${item.text}${item.text.endsWith("\n") ? "" : "\n"}--- ${sizeLine(item)}`);
+      }
+      const byId = new Map(items.map((item) => [item.id, item]));
+      const unknown = named.filter((id) => !byId.has(id));
+      if (unknown.length > 0) throw fail("E_USAGE", `no proposed item ${unknown.join(", ")}; proposed: ${items.map((item) => item.id).join(", ") || "none"}`);
+      const both = (ids ?? []).filter((id) => (strikes ?? []).includes(id));
+      if (both.length > 0) throw fail("E_USAGE", `${both.join(", ")} named in both --ids and --strike`);
+      before = snapshotActs(root, items);
+      const snapshot = before;
+      try {
+        for (const id of strikes ?? []) {
+          // Striking a principle, provision or update is the operator's ruling as much as adopting it.
           if (agent && OPERATOR_KINDS.some((prefix) => id.startsWith(prefix))) {
             acts.push({ id, act: "refused", refused: operatorOnly(id), code: "E_OPERATOR_ONLY" });
             continue;
           }
-          const refused = adoptAny(root, /** @type {ProposedItem} */ (byId.get(id)), date);
-          acts.push(refused === null ? { id, act: "adopted" } : { id, act: "refused", refused });
+          strikeAny(root, /** @type {ProposedItem} */ (byId.get(id)), date);
+          acts.push({ id, act: "struck" });
         }
+        if (ids !== null) {
+          for (const id of ids) {
+            if (agent && OPERATOR_KINDS.some((prefix) => id.startsWith(prefix))) {
+              acts.push({ id, act: "refused", refused: operatorOnly(id), code: "E_OPERATOR_ONLY" });
+              continue;
+            }
+            const refused = adoptAny(root, /** @type {ProposedItem} */ (byId.get(id)), date);
+            acts.push(refused === null ? { id, act: "adopted" } : { id, act: "refused", refused });
+          }
+        }
+      } catch (error) {
+        // An act that throws (a file that will not parse as adopted) leaves no half-done run behind.
+        restoreSnapshot(root, snapshot);
+        throw error;
       }
     }
 
     const refusals = acts.filter((act) => act.act === "refused");
-    const { compiled, commit, message } = settleActs(root, items, acts, context.env);
+    const { compiled, commit, message, rolledBack } = settleActs(root, items, acts, context.env, before);
     const ok = refusals.length === 0 && (compiled === null || compiled.errors.length === 0);
     const lines = [...shown];
     if (items.length === 0) lines.push("no proposed items");
     for (const act of acts) lines.push(act.code === undefined ? `${act.act} ${act.id}${act.refused ? `: ${act.refused}` : ""}` : `${act.code}: ${act.refused}`);
     if (compiled) {
-      lines.push(compiled.errors.length === 0 ? "compiled .house/generated/" : "compile refused: projections not updated");
+      if (rolledBack) {
+        const files = [...new Set(compiled.errors.map((finding) => finding.path).filter((path) => path !== undefined))];
+        lines.push(
+          `not adopted: the compile after it refused, so the adoption was undone and nothing was committed${files.length > 0 ? `; correct ${files.join(", ")} and adopt again` : ""}`,
+        );
+      } else {
+        lines.push(compiled.errors.length === 0 ? "compiled .house/generated/" : "compile refused: projections not updated");
+      }
       lines.push(...compiled.findings.map(findingLine));
     }
     if (commit !== null) lines.push(commitLine(commit, message));
@@ -238,8 +326,9 @@ export const adoptVerb = {
       exit: ok ? 0 : 1,
       data: {
         house: root,
-        proposed: items.map((item) => ({ id: item.id, path: item.path, chars: item.chars, surface: item.surface, surfaceChars: item.surfaceChars, cap: item.cap })),
+        proposed: items.map((item) => ({ id: item.id, path: item.path, chars: item.chars, surface: item.surface, surfaceChars: item.surfaceChars, cap: item.cap, text: item.text })),
         acts,
+        rolledBack,
         findings: compiled?.findings ?? [],
         commit: commit?.status === "committed" ? commit.sha : null,
         uncommitted: commit?.status === "uncommitted" ? { reason: commit.reason, command: commit.command } : null,

@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.3.0
+
+lampstand becomes a whole cockpit in Hermes: the house as native tools, a desktop House page, and rooms in which
+several chats work as one team, including from your phone. Found and fixed by running it from every angle with live
+models first.
+
+Hermes:
+
+- Nine house tools besides `lampstand_delegate`: `lampstand_house`, `lampstand_tasks`, `lampstand_inbox`,
+  `lampstand_knowledge`, `lampstand_reminders`, `lampstand_propose`, and the room tools `lampstand_room_post`,
+  `lampstand_room_read` and `lampstand_room_listen`. Each act through them, or through the House page, lands as one git
+  commit of exactly the files it changed.
+- `/lampstand` in any chat: `status`, `doctor`, `compile`, `adopt`, `tasks`, `inbox`, `rooms`, `listen`, `unlisten`
+  and `relay`. It works on the chat's own folder and prints plain text.
+- The desktop House page: five lamps for the house's checks with a legend, Overview, Work, Inbox, Knowledge,
+  Constitution (adopt or strike a proposal), Rooms, Rhythm and Health tabs, a reader that follows `[[links]]`, a
+  status-bar lamp, palette commands, `mod+alt+h`, a `::lampstand{...}` transcript card and a settings page.
+- Rooms: a chat brought into an agora room wakes when the room speaks and answers under its own name,
+  `<house>/<name>`. A new listen starts at the room's latest message; messages that arrive while a chat is closed wait
+  for it; a chat is never woken by its own posts; a chat woken 24 times in a row with nobody taking a turn pauses.
+  Listens follow a chat through compaction.
+- `/lampstand relay <room>` carries a room in a Telegram, Discord, Slack or other Hermes messaging chat: what you type
+  is posted to the room as you, and Hermes tells you what the room says.
+- The bundled skills load in Hermes as `lampstand:<name>`.
+- The maintenance gate counts what a session changed through the shell, not only through Hermes's file tools.
+- The plugin keeps its state per Hermes profile and writes it under a lock file, so several processes share it safely.
+
+The CLI:
+
+- Every `--json` result carries the human `text`; a refusal carries a plain `message`.
+- `task list` marks overdue tasks and sorts by due date; every date is the local calendar date.
+- A decision can be resolved with the operator's ruling in plain words.
+- `propose` checks a draft the way adoption and compile will and names every problem at once, with the template.
+- `adopt` puts every file back and commits nothing when the compile after it refuses; doctor names the file to fix.
+- `--` ends the options, so a title such as `--help` is taken as written.
+- `lampstand --version`.
+- Orientation names the open tasks (overdue first), the decisions waiting for you, reminders due and uncommitted work.
+- The gate no longer counts the compiled `AGENTS.md` region as work.
+- `adopt --ids` shows only the items named; a duplicate title says it was saved under another name.
+- `lint --json` returns its findings with `ok: true`.
+
 ## 0.2.2
 
 - `lampstand init` plants `projects/README.md`, a place for what the house builds, and `lampstand upgrade` plants it in

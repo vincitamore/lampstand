@@ -27,6 +27,13 @@ test("a change under projects/ is ordinary work: it owes a task record and a sta
   assert.deepEqual(ids(evaluateGate(root, ["projects/tool/src/main.js", "tasks/x.md", "state/current.md"], "remind")), []);
 });
 
+test("the AGENTS.md region a compile rewrites is a projection, not work: a compile owes no task and no state note", (t) => {
+  const { root } = makeHouse(t);
+  assert.deepEqual(ids(evaluateGate(root, ["AGENTS.md", ".house/generated/kernel.md", ".house/generated/manifest.json"], "remind")), []);
+  assert.deepEqual(ids(evaluateGate(root, [join(root, "AGENTS.md")], "block")), []);
+  assert.deepEqual(ids(evaluateGate(root, ["AGENTS.md", "projects/tool/a.js"], "remind")), ["task", "state"], "work beside it still owes");
+});
+
 test("a session that only maintained the record owes nothing", (t) => {
   const { root } = makeHouse(t);
   assert.deepEqual(ids(evaluateGate(root, ["inbox/captures/a.md", "knowledge/k.md", "forge/sessions/s.md"], "block")), []);

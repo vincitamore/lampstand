@@ -66,6 +66,15 @@ class RegisterIsCheap(unittest.TestCase):
             mock.patch("builtins.open", _forbidden),
         ):
             plugin.register(ctx)
-        self.assertEqual(set(ctx.hooks), {"pre_llm_call", "pre_verify"})
-        self.assertEqual(set(ctx.tools), {"lampstand_delegate"})
+        self.assertEqual(set(ctx.hooks), {"pre_llm_call", "post_llm_call", "pre_verify", "post_compaction", "post_gateway_admission"})
+        self.assertEqual(set(ctx.tools), {"lampstand_delegate", *plugin.TOOL_NAMES})
+        self.assertEqual(set(ctx.commands), {"lampstand"})
         self.assertEqual(set(ctx.sections), {"lampstand-kernel"})
+
+    def test_register_starts_no_thread(self) -> None:
+        import threading
+
+        plugin = self.fresh_plugin()
+        before = {t.name for t in threading.enumerate()}
+        plugin.register(RecordingContext())
+        self.assertNotIn("lampstand-rooms", {t.name for t in threading.enumerate()} - before)

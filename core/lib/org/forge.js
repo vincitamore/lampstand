@@ -7,7 +7,7 @@ import { fail, isLampstandError } from "../errors.js";
 import { parseFrontmatter } from "../frontmatter.js";
 import { atomicWrite, readText } from "../io.js";
 import { fillTemplate, fullPath } from "./items.js";
-import { renderItem, slugify, utcDate } from "./markdown.js";
+import { renderItem, slugify, localDate } from "./markdown.js";
 
 export const FORGE_DIR = "forge/sessions";
 export const LOG_HEADING = "## Execution log";
@@ -70,7 +70,7 @@ export function newSession(root, input) {
     pipeline,
   });
   mkdirSync(fullPath(root, FORGE_DIR), { recursive: true });
-  atomicWrite(fullPath(root, rel), renderItem({ kind: "forge", title, status: "open", created: utcDate(now), stages: input.stages }, body));
+  atomicWrite(fullPath(root, rel), renderItem({ kind: "forge", title, status: "open", created: localDate(now), stages: input.stages }, body));
   return rel;
 }
 

@@ -1,4 +1,5 @@
 // @ts-check
+import { localDate } from "../../core/lib/org/markdown.js";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -57,7 +58,7 @@ test("a kind's field names and its waived resolution line are read by lint", asy
   assert.deepEqual(messages(body, "reminders/old-name.md"), ["missing required field remind-at (kind reminder)"]);
   assert.deepEqual(messages(body, "tasks/resolved/undated.md"), ["missing required field completed (status done is terminal)"]);
   assert.deepEqual(messages(body, "inbox/decisions/resolved/chosen.md"), ["missing required field resolution (status decided is terminal)"]);
-  assert.deepEqual(messages(body, "reminders/call.md"), [`remind-at 2026-01-02, before today (${new Date().toISOString().slice(0, 10)})`]);
+  assert.deepEqual(messages(body, "reminders/call.md"), [`remind-at 2026-01-02, before today (${localDate()})`]);
 });
 
 test("create, list and transition write and read the house's field names", async (t) => {

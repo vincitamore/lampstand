@@ -56,8 +56,9 @@ than 22.18, add `--experimental-strip-types`: the OMP adapter's tests import its
   network work.
 - **The OMP extension registers no `tool_call`, `tool_result` or approval handler**; any of those turns off the
   host's speculative execution for every session.
-- **No step reads `git status`.** Jobs land only the paths they declared, and the gate reads changes with
-  `git diff` and `git ls-files`.
+- **The gate and jobs never read `git status`.** Jobs land only the paths they declared, and the gate reads changes
+  with `git diff` and `git ls-files`. The Hermes cockpit reads `git status --porcelain` to show the house's record and
+  to commit exactly the files one act changed.
 - **Tests write only to temporary directories.** Point the state and config roots at temp dirs
   (`LAMPSTAND_STATE_ROOT`, `LAMPSTAND_CONFIG_ROOT`) and never touch the real OS scheduler from a test.
 - **A test pins an invariant, not an incidental value.** "At the current schema version", not "version 1".

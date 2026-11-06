@@ -49,9 +49,23 @@ def find_node(env: Mapping[str, str] | None = None) -> str | None:
     return None
 
 
-def run_cli(args: list[str], root: str, env: Mapping[str, str] | None = None) -> CliResult:
-    """Runs `lampstand <args> --json` for the house at `root`. Raises NodeMissing or CliFailed."""
+def run_cli(
+    args: list[str],
+    root: str,
+    env: Mapping[str, str] | None = None,
+    *,
+    stdin_text: str | None = None,
+    operator: bool = False,
+    timeout: float = CLI_TIMEOUT_SECONDS,
+) -> CliResult:
+    """Runs `lampstand <args> --json` for the house at `root`. Raises NodeMissing or CliFailed.
+
+    `stdin_text` is handed to the CLI on stdin (for `--body -`). `operator` runs the verb as the person at the desktop
+    rather than the agent: LAMPSTAND_AGENT, which this process carries for its agent's shells, is left out, so the
+    operator's acts (adopt, strike) are not refused as an agent's."""
     env = dict(os.environ if env is None else env)
+    if operator:
+        env.pop("LAMPSTAND_AGENT", None)
     node = find_node(env)
     if node is None:
         raise NodeMissing()
@@ -62,16 +76,17 @@ def run_cli(args: list[str], root: str, env: Mapping[str, str] | None = None) ->
             [node, str(LAMPSTAND_JS), *args, "--json"],
             cwd=root,
             env=env,
-            stdin=subprocess.DEVNULL,
+            input=stdin_text,
+            stdin=subprocess.DEVNULL if stdin_text is None else None,
             capture_output=True,
             encoding="utf-8",
             errors="replace",
-            timeout=CLI_TIMEOUT_SECONDS,
+            timeout=timeout,
             creationflags=flags,
             check=False,
         )
     except subprocess.TimeoutExpired as error:
-        raise CliFailed(f"lampstand {args[0]} did not finish within {CLI_TIMEOUT_SECONDS:.0f}s") from error
+        raise CliFailed(f"lampstand {args[0]} did not finish within {timeout:.0f}s") from error
     except OSError as error:
         raise CliFailed(f"lampstand {args[0]} could not start: {error}") from error
     lines = completed.stdout.strip().splitlines()

@@ -10,8 +10,8 @@ import { fail, isLampstandError } from "../errors.js";
 import { parseFrontmatter } from "../frontmatter.js";
 import { atomicWrite, errorMessage, readText } from "../io.js";
 import { moveAndRelink } from "./links.js";
-import { editFrontmatter, isDate, maskCode, renderItem, slugify, utcDate } from "./markdown.js";
-import { fieldName, isTerminal, placeFor, UNLANDED_STATUSES } from "./schema.js";
+import { editFrontmatter, isDate, maskCode, renderItem, slugify, localDate } from "./markdown.js";
+import { fieldName, isTerminal, placeFor, RULING_STATUSES, UNLANDED_STATUSES } from "./schema.js";
 
 /** @typedef {import("./schema.js").Kind} Kind */
 /** @typedef {import("./schema.js").Field} Field */
@@ -235,18 +235,20 @@ export function fillTemplate(name, values) {
  * @param {OrgSchema} schema
  * @param {Kind} kind
  * @param {{ title: string, fields?: Partial<Record<Field, string>>, body?: string, stem?: string, now?: Date }} input
- * @returns {string} the new file's house-relative path
+ * @returns {{ path: string, wanted: string }} the new file's house-relative path, and the stem its title asked for
+ *   (the file's own stem differs when another item of the kind already held that name)
  */
 export function createItem(root, schema, kind, input) {
   const title = input.title.trim();
   if (title === "" || title.includes("\n")) throw fail("E_USAGE", "a title is one non-empty line");
   const now = input.now ?? new Date();
   const dir = placeFor(schema, kind, kind.folder, kind.initial);
-  const stem = freeStem(root, kind.places.map((place) => place.dir), input.stem ?? (slugify(title) || kind.name));
+  const wanted = input.stem ?? (slugify(title) || kind.name);
+  const stem = freeStem(root, kind.places.map((place) => place.dir), wanted);
   const rel = `${dir}/${stem}.md`;
   /** @type {Record<string, string>} */
   const fields = { [schema.kindField]: kind.value };
-  for (const [field, value] of Object.entries({ title, status: kind.initial, created: utcDate(now), ...input.fields })) {
+  for (const [field, value] of Object.entries({ title, status: kind.initial, created: localDate(now), ...input.fields })) {
     fields[fieldName(kind, field)] = value;
   }
   const extra = input.body === undefined || input.body.trim() === "" ? "" : `\n${input.body.trim()}\n`;
@@ -255,26 +257,33 @@ export function createItem(root, schema, kind, input) {
   mkdirSync(fullPath(root, dir), { recursive: true });
   const full = fullPath(root, rel);
   atomicWrite(full, renderItem(fields, body));
-  return rel;
+  return { path: rel, wanted };
 }
 
 /**
  * Checks a resolution: one line. For a status that means the work landed it names where, by a [[wikilink]] or a URL;
- * for one that means it landed nowhere (dropped, withdrawn, abandoned) it is a plain reason.
+ * for one that means it landed nowhere (dropped, withdrawn, abandoned) it is a plain reason; for one that records a
+ * ruling (a decision decided) it is the ruling itself, in plain words or with a link.
  * @param {string | undefined} resolution
  * @param {string} status  the terminal status being set
  */
 export function checkResolution(resolution, status) {
   const unlanded = UNLANDED_STATUSES.includes(status);
+  const ruling = RULING_STATUSES.includes(status);
   if (resolution === undefined || resolution.trim() === "") {
     throw fail(
       "E_USAGE",
-      unlanded ? `${status} needs --resolution "<one line reason>"` : `a terminal status needs --resolution "<one line>" naming where the work landed ([[link]] or URL)`,
+      unlanded
+        ? `${status} needs --resolution "<one line reason>"`
+        : ruling
+          ? `${status} needs --resolution "<the ruling, in one line>"`
+          : `a terminal status needs --resolution "<one line>" naming where the work landed ([[link]] or URL)`,
     );
   }
   if (/[\r\n]/.test(resolution)) throw fail("E_USAGE", "--resolution is one line");
-  if (!unlanded && !/\[\[[^\[\]\n]+\]\]|\bhttps?:\/\/\S+/.test(resolution)) {
-    throw fail("E_USAGE", `--resolution must name where the work landed with a [[wikilink]] or a URL (only ${UNLANDED_STATUSES.join(", ")} take a plain reason)`);
+  if (!unlanded && !ruling && !/\[\[[^\[\]\n]+\]\]|\bhttps?:\/\/\S+/.test(resolution)) {
+    const ruled = RULING_STATUSES.length > 0 ? `; ${RULING_STATUSES.join(", ")} takes the ruling in plain words` : "";
+    throw fail("E_USAGE", `--resolution must name where the work landed with a [[wikilink]] or a URL (only ${UNLANDED_STATUSES.join(", ")} take a plain reason${ruled})`);
   }
   return resolution.trim();
 }
@@ -289,7 +298,7 @@ export function checkResolution(resolution, status) {
  */
 
 /**
- * Moves an item to `status`, enforcing the lifecycle in one act: a terminal status sets `resolved` (today, UTC) and
+ * Moves an item to `status`, enforcing the lifecycle in one act: a terminal status sets `resolved` (today, local date) and
  * `resolution` (which a kind that does not require one may go without), a non-terminal one clears both, and the file
  * moves to the folder its new status belongs in (keeping its subfolder within a nested kind's place). Every link to
  * the old path is rewritten. Other fields in `fields` are set alongside.
@@ -303,6 +312,9 @@ export function transition(root, schema, item, change) {
   if (item.error || !item.frontmatter) {
     throw item.error ?? fail("E_PARSE_FRONTMATTER", "the item has no frontmatter", { path: item.rel, line: 1 });
   }
+  // A second act on the same item (a double submit) finds it gone from where it was read: refuse rather than write a
+  // copy back at the old path and move it beside the first as `-2`.
+  if (!existsSync(fullPath(root, item.rel))) throw fail("E_USAGE", `${item.rel} has already moved; list the items again`);
   const status = change.status ?? statusOf(item) ?? item.kind.initial;
   if (!item.kind.statuses.includes(status)) {
     throw fail("E_USAGE", `${JSON.stringify(status)} is not a ${item.kind.name} status; use one of ${item.kind.statuses.join(", ")}`);
@@ -317,7 +329,7 @@ export function transition(root, schema, item, change) {
     const before = statusOf(item);
     const wasTerminal = before !== undefined && isTerminal(kind, before) && item.place === placeFor(schema, kind, item.folder, before);
     if (change.resolution !== undefined || !wasTerminal) {
-      edits[resolvedKey] = utcDate(change.now);
+      edits[resolvedKey] = localDate(change.now);
       if (change.resolution !== undefined || kind.resolutionRequired) edits[resolutionKey] = checkResolution(change.resolution, status);
     }
   } else {

@@ -1,9 +1,10 @@
 {
-  "$comment": "The org substrate's schema as data, read by core/lib/org/schema.js. Each kind names the folder new items are written to, its statuses, the terminal ones (reaching one sets resolved_fields and moves the file into <folder>/resolved/), the status an item without a status field has, and the frontmatter fields every item of the kind carries. A terminal status in unlanded_statuses means the work did not land anywhere, so its resolution is a plain one-line reason; every other terminal status needs a resolution naming where the work landed ([[wikilink]] or URL). The field `kind` names an item's kind and its value is the kind's name. house.toml [org] may add kinds, statuses and folders, never remove these, and may say how a house that predates lampstand names and places its items; house_toml is the JSON Schema subset that table is validated against.",
+  "$comment": "The org substrate's schema as data, read by core/lib/org/schema.js. Each kind names the folder new items are written to, its statuses, the terminal ones (reaching one sets resolved_fields and moves the file into <folder>/resolved/), the status an item without a status field has, and the frontmatter fields every item of the kind carries. A terminal status in unlanded_statuses means the work did not land anywhere, so its resolution is a plain one-line reason; a terminal status in ruling_statuses records a ruling, so its resolution is the ruling in plain words (a link may stand in it too); every other terminal status needs a resolution naming where the work landed ([[wikilink]] or URL). The field `kind` names an item's kind and its value is the kind's name. house.toml [org] may add kinds, statuses and folders, never remove these, and may say how a house that predates lampstand names and places its items; house_toml is the JSON Schema subset that table is validated against.",
   "version": 1,
   "resolved_folder": "resolved",
   "resolved_fields": ["resolved", "resolution"],
   "unlanded_statuses": ["dropped", "withdrawn", "abandoned"],
+  "ruling_statuses": ["decided"],
   "kinds": {
     "task": {
       "folder": "tasks",

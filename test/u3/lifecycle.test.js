@@ -4,9 +4,12 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { parseFrontmatter } from "../../core/lib/frontmatter.js";
+import { createItem, scanItems, transition } from "../../core/lib/org/items.js";
+import { localDate } from "../../core/lib/org/markdown.js";
+import { loadOrgSchema } from "../../core/lib/org/schema.js";
 import { cli, cliJson, makeHouse, plant, read } from "./helpers.js";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDate();
 
 test("round trip: one of each kind, a decision resolved into resolved/ with links rewritten, lint clean", async (t) => {
   const house = makeHouse(t);
@@ -174,7 +177,7 @@ test("a status that means the work landed needs a link; dropped, withdrawn and a
     const reason = await cliJson([args[0] === "decide" ? "decide" : "inbox", args[0] === "decide" ? "resolve" : "set", name ?? "", "--status", status, "--resolution", "no longer wanted"], house);
     const plain = ["dropped", "withdrawn", "abandoned"].includes(status);
     assert.equal(reason.code, plain ? 0 : 64, `${status}: ${JSON.stringify(reason.body)}`);
-    if (!plain) assert.match(reason.body.error.message, /must name where the work landed with a \[\[wikilink\]\] or a URL \(only dropped, withdrawn, abandoned take a plain reason\)/);
+    if (!plain) assert.match(reason.body.error.message, /must name where the work landed with a \[\[wikilink\]\] or a URL \(only dropped, withdrawn, abandoned take a plain reason; decided takes the ruling in plain words\)/);
   }
   const missing = await cliJson(["inbox", "set", "cache-the-other-index", "--status", "dropped"], house);
   assert.equal(missing.code, 64);
@@ -194,4 +197,62 @@ test("a long title is cut at the last whole word that fits, and a single long wo
   const title = "A nested-loop join degrades a recursive Datalog rule from O(n) to O(n squared) in practice";
   const made = await cliJson(["knowledge", "new", title], house);
   assert.equal(made.body.path, "knowledge/a-nested-loop-join-degrades-a-recursive-datalog-rule-from-o.md");
+});
+
+test("a decision is resolved with the operator's ruling in plain words; a link still works and an empty ruling is refused", async (t) => {
+  const house = makeHouse(t);
+  assert.equal((await cliJson(["decide", "new", "Which plumber to call"], house)).code, 0);
+  const ruled = await cliJson(["decide", "resolve", "which-plumber-to-call", "--resolution", "Go with Ace Plumbing."], house);
+  assert.equal(ruled.code, 0, JSON.stringify(ruled.body));
+  assert.equal(ruled.body.to, "inbox/decisions/resolved/which-plumber-to-call.md");
+  const fm = /** @type {Record<string, unknown>} */ (parseFrontmatter(read(house.root, ruled.body.to), ruled.body.to).frontmatter);
+  assert.deepEqual([fm.status, fm.resolution, fm.resolved], ["decided", "Go with Ace Plumbing.", today()]);
+  assert.match(ruled.body.text, /-> inbox\/decisions\/resolved\/which-plumber-to-call\.md \(decided\)/, "the JSON carries the human text");
+
+  assert.equal((await cliJson(["decide", "new", "Pick a store"], house)).code, 0);
+  assert.equal((await cliJson(["inbox", "set", "pick-a-store", "--status", "decided", "--resolution", "Chosen in [[knowledge/stores]]"], house)).code, 0);
+  assert.equal((await cliJson(["decide", "new", "Pick a colour"], house)).code, 0);
+  const empty = await cliJson(["decide", "resolve", "pick-a-colour", "--resolution", " "], house);
+  assert.equal(empty.code, 64);
+  assert.match(empty.body.message, /decided needs --resolution "<the ruling, in one line>"/);
+  const task = await cliJson(["task", "new", "Fix the sink"], house);
+  const unlinked = await cliJson(["task", "done", "fix-the-sink", "--resolution", "fixed it"], house);
+  assert.equal(unlinked.code, 64, "a task's done still names where the work landed");
+  assert.equal(task.code, 0);
+});
+
+test("a duplicate title is saved under a free name and the result says so", async (t) => {
+  const house = makeHouse(t);
+  const first = await cliJson(["task", "new", "Buy stamps"], house);
+  assert.equal(first.body.renamedFrom, null);
+  assert.equal(first.body.text, "created tasks/buy-stamps.md");
+  const second = await cliJson(["task", "new", "Buy stamps"], house);
+  assert.equal(second.body.path, "tasks/buy-stamps-2.md");
+  assert.equal(second.body.renamedFrom, "buy-stamps.md");
+  assert.match(second.body.text, /^created tasks\/buy-stamps-2\.md \(a task named buy-stamps\.md already existed; saved as buy-stamps-2\.md\)$/);
+});
+
+test("an item that has already moved is not resolved a second time from a stale read", (t) => {
+  const house = makeHouse(t);
+  const schema = loadOrgSchema(house.root);
+  const kind = /** @type {import("../../core/lib/org/schema.js").Kind} */ (schema.kinds.get("decision"));
+  createItem(house.root, schema, kind, { title: "Reissue the hardcover" });
+  const [stale] = scanItems(house.root, schema).filter((item) => item.kind.name === "decision");
+  transition(house.root, schema, stale, { status: "decided", resolution: "Yes, in spring." });
+  assert.throws(() => transition(house.root, schema, stale, { status: "decided", resolution: "Yes, in spring." }), /has already moved/);
+  assert.ok(!existsSync(join(house.root, "inbox", "decisions", "resolved", "reissue-the-hardcover-2.md")), "no -2 copy is written");
+  assert.ok(!existsSync(join(house.root, "inbox", "decisions", "reissue-the-hardcover.md")), "nothing is written back at the old path");
+});
+
+test("task list marks an open task past its due date overdue, by the local date, and lists by due date", async (t) => {
+  const house = makeHouse(t);
+  assert.equal((await cliJson(["task", "new", "Later", "--due", "2999-01-01"], house)).code, 0);
+  assert.equal((await cliJson(["task", "new", "Undated"], house)).code, 0);
+  assert.equal((await cliJson(["task", "new", "Galley proofs", "--due", "2001-11-01"], house)).code, 0);
+  const listed = await cliJson(["task", "list"], house);
+  assert.deepEqual(
+    listed.body.items.map((/** @type {any} */ row) => [row.id, row.overdue]),
+    [["galley-proofs", true], ["later", false], ["undated", false]],
+  );
+  assert.match((await cli(["task", "list"], house)).stdout, /due 2001-11-01 \(overdue\)/);
 });

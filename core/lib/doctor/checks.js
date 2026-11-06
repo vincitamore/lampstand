@@ -102,7 +102,7 @@ export const CHECKS = [
     id: "projections",
     area: "core",
     quick: true,
-    codes: { CONSTITUTION_INVALID: 2, PROJECTION_MISSING: 1, PROJECTION_STALE: 1, REGION_STALE: 1 },
+    codes: { CONSTITUTION_INVALID: 2, COMPILE_REFUSED: 2, PROJECTION_MISSING: 1, PROJECTION_STALE: 1, REGION_STALE: 1 },
     check(facts) {
       const house = houseOf(facts);
       if (house === null || house.constitution === null || house.generated === null) return [];
@@ -112,24 +112,32 @@ export const CHECKS = [
       if (!constitution.ok) {
         out.push({ code: "CONSTITUTION_INVALID", message: constitution.failure.message, fix: "correct the file it names; lampstand compile then rebuilds the projections" });
       }
-      const { inputHash, files } = house.generated;
-      if ("code" in files) return [...out, { code: "PROJECTION_STALE", message: files.message, fix: "lampstand compile" }];
-      const onDisk = new Map(files.map((file) => [file.name, file.inputHash]));
+      // While a curation rule fails, lampstand compile refuses to write: naming it as the fix would send the reader in
+      // a circle, so every fix names the files to correct instead.
+      const refused = constitution.ok ? constitution.refused ?? [] : [];
+      const files = [...new Set(refused.map((finding) => finding.path).filter((path) => path !== null))];
+      const compile = refused.length === 0 ? "lampstand compile" : `correct ${files.length > 0 ? files.join(", ") : "the constitution (see COMPILE_REFUSED)"}, then lampstand compile`;
+      for (const finding of refused) {
+        out.push({ code: "COMPILE_REFUSED", message: `${finding.path ? `${finding.path}: ` : ""}${finding.message}; lampstand compile refuses until it is fixed`, fix: `correct ${finding.path ?? "the file it names"}` });
+      }
+      const { inputHash, files: generated } = house.generated;
+      if ("code" in generated) return [...out, { code: "PROJECTION_STALE", message: generated.message, fix: compile }];
+      const onDisk = new Map(generated.map((file) => [file.name, file.inputHash]));
       if (constitution.ok) {
         for (const name of constitution.expected) {
-          if (!onDisk.has(name)) out.push({ code: "PROJECTION_MISSING", message: `${GENERATED_DIR}/${name} is missing`, fix: "lampstand compile" });
+          if (!onDisk.has(name)) out.push({ code: "PROJECTION_MISSING", message: `${GENERATED_DIR}/${name} is missing`, fix: compile });
         }
       }
       if (typeof inputHash === "string") {
         for (const [name, recorded] of onDisk) {
-          if (recorded === null) out.push({ code: "PROJECTION_STALE", message: `${GENERATED_DIR}/${name} carries no input hash`, fix: "lampstand compile" });
+          if (recorded === null) out.push({ code: "PROJECTION_STALE", message: `${GENERATED_DIR}/${name} carries no input hash`, fix: compile });
           else if (recorded !== inputHash) {
-            out.push({ code: "PROJECTION_STALE", message: `${GENERATED_DIR}/${name} was compiled from inputs that have since changed (input-hash ${recorded.slice(0, 12)}, now ${inputHash.slice(0, 12)})`, fix: "lampstand compile" });
+            out.push({ code: "PROJECTION_STALE", message: `${GENERATED_DIR}/${name} was compiled from inputs that have since changed (input-hash ${recorded.slice(0, 12)}, now ${inputHash.slice(0, 12)})`, fix: compile });
           }
         }
       }
       if (constitution.ok && constitution.regionStale) {
-        out.push({ code: "REGION_STALE", message: `the generated region of ${AGENTS_FILE} differs from a fresh compile`, fix: "lampstand compile" });
+        out.push({ code: "REGION_STALE", message: `the generated region of ${AGENTS_FILE} differs from a fresh compile`, fix: compile });
       }
       return out;
     },

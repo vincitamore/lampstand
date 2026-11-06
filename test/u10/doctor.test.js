@@ -20,7 +20,7 @@ test("the check list is pinned", () => {
     [
       { id: "house-marker", area: "core", quick: true, codes: { NO_HOUSE: 3, HOUSE_UNRESOLVED: 3, SETUP_UNFINISHED: 3, HOUSE_ROOT_ELSEWHERE: 0 } },
       { id: "house-toml", area: "core", quick: true, codes: { HOUSE_TOML_INVALID: 2, HOUSE_SCHEMA_NEWER: 2, HOUSE_SCHEMA_OLDER: 1, PLUGIN_TOO_OLD: 2 } },
-      { id: "projections", area: "core", quick: true, codes: { CONSTITUTION_INVALID: 2, PROJECTION_MISSING: 1, PROJECTION_STALE: 1, REGION_STALE: 1 } },
+      { id: "projections", area: "core", quick: true, codes: { CONSTITUTION_INVALID: 2, COMPILE_REFUSED: 2, PROJECTION_MISSING: 1, PROJECTION_STALE: 1, REGION_STALE: 1 } },
       { id: "budgets", area: "core", quick: true, codes: { BUDGET_OVER_ENVELOPE: 2 } },
       { id: "state-db", area: "core", quick: true, codes: { STATE_DB_NEWER: 2, STATE_DB_UNREADABLE: 2 } },
       { id: "state-local", area: "core", quick: true, codes: { STATE_DIR_INVALID: 2, STATE_DIR_NOT_LOCAL: 2 } },
@@ -100,13 +100,16 @@ test("lampstand doctor --json: exit 0 in a healthy house, 3 outside any house", 
   const script = entry(dir);
   const healthy = cli(script, ["doctor", "--json"], root, env);
   assert.equal(healthy.status, 0, healthy.stderr);
-  assert.deepEqual(JSON.parse(healthy.stdout), { ok: true, exit: 0, findings: [] });
+  const { text: healthyText, ...rest } = JSON.parse(healthy.stdout);
+  assert.deepEqual(rest, { ok: true, exit: 0, findings: [] });
+  assert.match(healthyText, /^doctor: exit 0, healthy/, "the JSON carries the human text");
 
   const outside = tempDir(t);
   const none = cli(script, ["doctor", "--json"], outside, doctorEnv(outside));
   assert.equal(none.status, 3, none.stderr);
   const body = JSON.parse(none.stdout);
-  assert.deepEqual(Object.keys(body), ["ok", "exit", "findings"]);
+  assert.deepEqual(Object.keys(body), ["ok", "exit", "findings", "text", "message"]);
+  assert.equal(body.message, body.text, "a refusal carries its reason as message");
   assert.equal(body.ok, false);
   assert.equal(body.exit, 3);
   assert.deepEqual(body.findings.map((/** @type {any} */ finding) => Object.keys(finding)), [["code", "area", "level", "message", "fix"]]);

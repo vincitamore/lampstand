@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { readRecord, today } from "../../core/lib/constitution/curate.js";
+import { draftProblems, readRecord, today } from "../../core/lib/constitution/curate.js";
+import { PROPOSAL_EXAMPLES } from "../../core/lib/constitution/examples.js";
 import { parseReflexText } from "../../core/lib/constitution/parse.js";
 import { adoptInteractively } from "../../core/lib/constitution/verbs.js";
 import { contentHash } from "../../core/lib/io.js";
@@ -174,4 +175,47 @@ test("propose validates the draft as its kind before filing it", (t) => {
   assert.equal(result.status, 1);
   assert.equal(envelope(result.stdout).error.code, "E_SCHEMA");
   assert.ok(!existsSync(join(root, "proposals", "reflexes", "bad.md")));
+});
+
+test("propose reports every missing or invalid field at once, with the template for the kind", (t) => {
+  const root = tempDir(t);
+  const env = setup(root);
+  plant(root, { "drafts/check-the-trap.md": "Before calling a plumber, check the trap.\n" });
+  const bare = lampstand(["propose", "reflex", "drafts/check-the-trap.md", "--occasion", "a blocked sink", "--json"], { cwd: root, env });
+  assert.equal(bare.status, 1);
+  const message = envelope(bare.stdout).message;
+  assert.match(message, /the draft is not a reflex lampstand can adopt \(4 problems\):/);
+  assert.match(message, /- a reflex draft must open with a frontmatter block/);
+  assert.match(message, /- frontmatter is missing `scope`, `summary`/);
+  assert.match(message, /- reflex check-the-trap carries no falsified-when trigger/);
+  assert.match(message, /- reflex check-the-trap carries no revise step/);
+  assert.match(message, /A reflex draft looks like this .*\n {4}---\n {4}scope: behavioral\n {4}summary: /);
+  assert.ok(!existsSync(join(root, "proposals", "reflexes", "check-the-trap.md")));
+
+  plant(root, { "drafts/half.md": '---\nscope: "tool:emacs"\nsummary: "x"\ntitle: "T"\n---\nBody\n' });
+  const half = envelope(lampstand(["propose", "reflex", "drafts/half.md", "--occasion", "y", "--json"], { cwd: root, env }).stdout).message;
+  assert.match(half, /\(4 problems\)/);
+  assert.match(half, /- frontmatter key `title` is not one a reflex carries \(scope, summary, falsified-when, revise\)/);
+  assert.match(half, /- scope must match/);
+
+  plant(root, { "drafts/thrift.md": "### th : Thrift\n\nSpend less.\n" });
+  const principle = envelope(lampstand(["propose", "principle", "drafts/thrift.md", "--occasion", "z", "--json"], { cwd: root, env }).stdout).message;
+  assert.match(principle, /must open with an italic thesis paragraph/);
+  assert.match(principle, /must list its facets as/);
+  assert.match(principle, /needs a `\*Failure mode:\*` \(or `\*Vice:\*`\) paragraph/);
+});
+
+test("a reflex the compiler would reject is refused at propose: the draft owes falsified-when and revise", (t) => {
+  const root = tempDir(t);
+  const env = setup(root);
+  plant(root, { "drafts/x.md": "---\nscope: behavioral\nsummary: x\n---\nx\n" });
+  const result = lampstand(["propose", "reflex", "drafts/x.md", "--occasion", "y", "--json"], { cwd: root, env });
+  assert.equal(result.status, 1);
+  assert.match(envelope(result.stdout).error.message, /carries no falsified-when trigger[\s\S]*carries no revise step/);
+});
+
+test("every template the propose help shows passes every check propose applies", () => {
+  for (const kind of /** @type {const} */ (["principle", "provision", "reflex"])) {
+    assert.deepEqual(draftProblems(kind, PROPOSAL_EXAMPLES[kind].text, `/h/proposals/${kind}s/${PROPOSAL_EXAMPLES[kind].file}`), [], kind);
+  }
 });

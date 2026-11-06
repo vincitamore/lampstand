@@ -36,7 +36,7 @@ test("lampstand root --json inside a house reports walk-up", (t) => {
   plant(dir, { "house/house.toml": HOUSE_TOML, "house/tasks/.keep": "" });
   const result = lampstand(["root", "--json"], { cwd: join(dir, "house", "tasks"), env: isolatedEnv(dir) });
   assert.equal(result.status, 0, result.stderr);
-  assert.deepEqual(envelope(result.stdout), { ok: true, rule: "walk-up", root: join(dir, "house") });
+  assert.deepEqual(envelope(result.stdout), { ok: true, rule: "walk-up", root: join(dir, "house"), text: `${join(dir, "house")}\nrule: walk-up` });
 });
 
 test("lampstand root --json with HOUSE_ROOT lacking house.toml exits 1 with E_HOUSE_ROOT_INVALID", (t) => {
@@ -54,7 +54,7 @@ test("lampstand root --json with no house is dormant and exits 0", (t) => {
   const dir = tempDir(t);
   const result = lampstand(["root", "--json"], { cwd: dir, env: isolatedEnv(dir) });
   assert.equal(result.status, 0, result.stderr);
-  assert.deepEqual(envelope(result.stdout), { ok: true, rule: "dormant", root: null });
+  assert.deepEqual(envelope(result.stdout), { ok: true, rule: "dormant", root: null, text: `dormant: no house resolved from ${dir}` });
 });
 
 test("lampstand root --no-workspace uses default_house; without the flag it stays dormant", (t) => {
@@ -69,6 +69,7 @@ test("lampstand root --no-workspace uses default_house; without the flag it stay
     ok: true,
     rule: "default_house",
     root: join(dir, "home"),
+    text: `${join(dir, "home")}\nrule: default_house`,
   });
   assert.equal(envelope(lampstand(["root", "--json"], options).stdout).rule, "dormant");
 });
@@ -134,9 +135,9 @@ test("dispatch reaches registered verbs, maps error codes to exit codes, and tur
     const code = await runCli(registry, argv, { stdout, stderr, env: {}, cwd: "." });
     return { code, stdout: stdout.text(), stderr: stderr.text() };
   };
-  assert.deepEqual(await call(["probe", "deep", "--json", "v"]), { code: 0, stdout: '{"ok":true,"got":"v"}\n', stderr: "" });
-  assert.deepEqual(await call(["--json", "probe", "deep", "--", "--json"]), { code: 0, stdout: '{"ok":true,"got":"--json"}\n', stderr: "" });
-  assert.deepEqual(await call(["finding", "--json"]), { code: 1, stdout: '{"ok":false,"n":2}\n', stderr: "" });
+  assert.deepEqual(await call(["probe", "deep", "--json", "v"]), { code: 0, stdout: '{"ok":true,"got":"v","text":""}\n', stderr: "" });
+  assert.deepEqual(await call(["--json", "probe", "deep", "--", "--json"]), { code: 0, stdout: '{"ok":true,"got":"--json","text":""}\n', stderr: "" });
+  assert.deepEqual(await call(["finding", "--json"]), { code: 1, stdout: '{"ok":false,"n":2,"text":"two findings","message":"two findings"}\n', stderr: "" });
   const broken = await call(["broken", "--json"]);
   assert.equal(broken.code, 70);
   assert.equal(JSON.parse(broken.stdout).error.code, "E_INTERNAL");
@@ -144,6 +145,43 @@ test("dispatch reaches registered verbs, maps error codes to exit codes, and tur
   const infra = await call(["infra"]);
   assert.equal(infra.code, 2);
   assert.equal(infra.stderr, "lampstand: E_STATE_DIR: no room\n");
+});
+
+test("`--` ends the flags: a positional that looks like a flag is taken as written, and a trailing --json is the flag", async () => {
+  const registry = new Registry().register({
+    name: "probe deep",
+    summary: "s",
+    args: { min: 1, max: 1, usage: "<x>" },
+    run: ({ args, json }) => ({ data: { got: args[0], json }, text: `got ${args[0]}` }),
+  });
+  /** @param {string[]} argv */
+  const call = async (argv) => {
+    const stdout = sink();
+    const code = await runCli(registry, argv, { stdout, stderr: sink(), env: {}, cwd: "." });
+    return { code, stdout: stdout.text() };
+  };
+  assert.deepEqual(await call(["probe", "deep", "--", "--help"]), { code: 0, stdout: "got --help\n" }, "a title --help is a title, not a help request");
+  assert.deepEqual(await call(["probe", "deep", "--", "--"]), { code: 0, stdout: "got --\n" }, "a title -- is a title");
+  const appended = await call(["probe", "deep", "--", "--", "--json"]);
+  assert.equal(appended.code, 0);
+  assert.deepEqual(JSON.parse(appended.stdout), { ok: true, got: "--", json: true, text: "got --" }, "--json appended after free text is the flag");
+  assert.equal(JSON.parse((await call(["probe", "deep", "--", "--due=x", "--json"])).stdout).got, "--due=x");
+  const usage = await call(["probe", "deep", "--help"]);
+  assert.match(usage.stdout, /^usage: lampstand probe deep <x>/);
+  assert.match(usage.stdout, /--  end of flags/);
+});
+
+test("lampstand --version prints the version; a failure in JSON carries a plain message beside error", (t) => {
+  const dir = tempDir(t);
+  const options = { cwd: dir, env: isolatedEnv(dir) };
+  const plain = lampstand(["--version"], options);
+  assert.equal(plain.status, 0, plain.stderr);
+  assert.match(plain.stdout, /^lampstand \d+\.\d+\.\d+ \(/);
+  assert.match(envelope(lampstand(["--json", "-v"], options).stdout).version, /^\d+\.\d+\.\d+$/);
+  const failed = envelope(lampstand(["nope", "--json"], options).stdout);
+  assert.equal(failed.ok, false);
+  assert.equal(typeof failed.message, "string");
+  assert.equal(failed.message, failed.error.message);
 });
 
 test("a verb name or global flag cannot be registered twice", () => {

@@ -62,7 +62,8 @@ class TempTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(os.path.realpath(tempfile.mkdtemp(prefix="lampstand-u6-")))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-        roots = {"LAMPSTAND_STATE_ROOT": "state-root", "LAMPSTAND_CONFIG_ROOT": "config-root"}
+        # HERMES_HOME too: the adapter remembers the houses its sessions work in under the Hermes home.
+        roots = {"LAMPSTAND_STATE_ROOT": "state-root", "LAMPSTAND_CONFIG_ROOT": "config-root", "HERMES_HOME": "hermes-home"}
         env = mock.patch.dict(os.environ, {key: str(self.tmp / name) for key, name in roots.items()})
         env.start()
         self.addCleanup(env.stop)
@@ -121,6 +122,8 @@ class RecordingContext:
         self.sections: dict[str, tuple] = {}
         self.hooks: dict[str, object] = {}
         self.tools: dict[str, dict] = {}
+        self.commands: dict[str, dict] = {}
+        self.injected: list[tuple[str, str | None]] = []
         self.cwd = cwd
         self.surface = surface
         if lifecycle is not None:
@@ -134,6 +137,13 @@ class RecordingContext:
 
     def register_tool(self, name, toolset, schema, handler, **kwargs):
         self.tools[name] = {"toolset": toolset, "schema": schema, "handler": handler, **kwargs}
+
+    def register_command(self, name, handler, description="", args_hint="", argument_mode=None):
+        self.commands[name] = {"handler": handler, "description": description, "args_hint": args_hint}
+
+    def inject_message(self, content, role="user", *, session_key=None):
+        self.injected.append((content, session_key))
+        return True
 
     def session_cwd(self) -> str:
         return self.cwd

@@ -1,17 +1,18 @@
 // @ts-check
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { inputHash, readInputs } from "../../core/lib/constitution/house.js";
-import { capLines, orient } from "../../core/lib/orient.js";
+import { capLines, NAMED, NOTHING_OPEN, orient } from "../../core/lib/orient.js";
 import { openStateDb } from "../../core/lib/state/db.js";
 import { stateDirFor } from "../../core/lib/state/paths.js";
 import { HOUSE_ID, cli, cliJson, makeHouse, plant } from "./helpers.js";
 
 const task = (/** @type {string} */ status) => `---\nkind: task\ntitle: T\nstatus: ${status}\ncreated: "2026-01-01"\n---\n`;
 
-test("counts per kind and status, in schema order, and nothing else on a healthy house", async (t) => {
+test("status leads with counts per kind and status, in schema order; an empty house says so in plain words", async (t) => {
   const house = makeHouse(t, {
     files: {
       "tasks/a.md": task("open"),
@@ -22,10 +23,76 @@ test("counts per kind and status, in schema order, and nothing else on a healthy
       "inbox/decisions/x.md": '---\nkind: decision\ntitle: X\nstatus: open\ncreated: "2026-01-01"\n---\n',
     },
   });
-  const { code, stdout } = await cli(["status", "--orient"], house);
+  const { code, stdout } = await cli(["status"], house);
   assert.equal(code, 0);
-  assert.equal(stdout, "task 5: open 2, active 1, done 1, (unparsed) 1\ndecision 1: open 1\n");
-  assert.equal((await cli(["status"], makeHouse(t))).stdout, "org: no items\n");
+  assert.match(stdout, /^task 5: open 2, active 1, done 1, \(unparsed\) 1\ndecision 1: open 1\n/);
+  assert.equal((await cli(["status"], makeHouse(t))).stdout, `${NOTHING_OPEN}\n`);
+  assert.equal((await cli(["status", "--orient"], makeHouse(t))).stdout, `${NOTHING_OPEN}\n`);
+});
+
+test("orientation names what needs attention: open tasks overdue first, decisions, reminders due, and the rest counted", async (t) => {
+  /** @param {string} kind @param {string} title @param {string} status @param {string} [due] */
+  const item = (kind, title, status, due) => `---\nkind: ${kind}\ntitle: ${title}\nstatus: ${status}\ncreated: "2026-01-01"\n${due ? `due: "${due}"\n` : ""}---\n`;
+  const house = makeHouse(t, {
+    files: {
+      "tasks/catalog.md": item("task", "Draft catalog copy", "open"),
+      "tasks/galley.md": item("task", "Send galley proofs", "open", "2001-11-01"),
+      "tasks/quotes.md": item("task", "Request printer quotes", "active", "2999-01-01"),
+      "tasks/resolved/old.md": `${item("task", "Old work", "done").slice(0, -4)}resolved: "2026-01-02"\nresolution: "[[x]]"\n---\n`,
+      "inbox/decisions/reissue.md": item("decision", "Reissue the hardcover?", "open"),
+      "reminders/statements.md": item("reminder", "Send statements", "open", "2001-11-03"),
+      "reminders/renew.md": item("reminder", "Renew the domain", "open", "2999-06-01"),
+      "inbox/captures/c.md": "---\nkind: capture\ncreated: \"2026-01-01\"\n---\nA thought\n",
+      "knowledge/k.md": item("knowledge", "How releases work", "current"),
+    },
+  });
+  const { code, body } = await cliJson(["status", "--orient"], house);
+  assert.equal(code, 0);
+  assert.equal(
+    body.text,
+    [
+      "Open tasks (3, 1 overdue):",
+      "- Send galley proofs (due 2001-11-01, overdue)",
+      "- Request printer quotes (active; due 2999-01-01)",
+      "- Draft catalog copy",
+      "Decisions waiting for the operator's ruling (1):",
+      "- Reissue the hardcover?",
+      "Reminders due (1):",
+      "- Send statements (due 2001-11-03, overdue)",
+      "Also open: 1 capture, 1 knowledge.",
+    ].join("\n"),
+  );
+  assert.deepEqual(body.attention.tasks.map((/** @type {any} */ named) => [named.id, named.overdue]), [["galley", true], ["quotes", false], ["catalog", false]]);
+  assert.equal(body.uncommitted, null, "a house that is not a git repository has no uncommitted count");
+  assert.equal(body.text.includes("Old work"), false, "a resolved task is not named");
+});
+
+test("orientation names at most a few of each and counts the rest", (t) => {
+  /** @type {Record<string, string>} */
+  const files = {};
+  for (let k = 0; k < NAMED.tasks + 3; k++) files[`tasks/t${String(k).padStart(2, "0")}.md`] = `---\nkind: task\ntitle: Task ${k}\nstatus: open\ncreated: "2026-01-01"\n---\n`;
+  const house = makeHouse(t, { files });
+  const { lines, attention } = orient(house.root, { env: house.env });
+  assert.equal(attention.tasks.length, NAMED.tasks + 3);
+  assert.equal(lines.filter((line) => line.startsWith("- Task ")).length, NAMED.tasks);
+  assert.ok(lines.includes("- and 3 more (lampstand task list)"));
+});
+
+test("orientation counts the changes not yet committed in a git house", (t) => {
+  const house = makeHouse(t, { files: { "tasks/a.md": task("open") } });
+  /** @param {string[]} args */
+  const git = (...args) => {
+    const result = spawnSync("git", ["-C", house.root, "-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  git("init", "-q");
+  git("add", "-A");
+  git("commit", "-q", "-m", "start");
+  assert.equal(orient(house.root, { env: house.env }).uncommitted, 0);
+  plant(house.root, { "tasks/a.md": task("active"), "projects/new.md": "x\n" });
+  const found = orient(house.root, { env: house.env });
+  assert.equal(found.uncommitted, 2);
+  assert.ok(found.lines.includes("2 changes in the house not yet committed."));
 });
 
 test("a projection whose manifest input hash no longer matches is reported; a fresh one is not", async (t) => {
@@ -44,7 +111,7 @@ test("a house.schema newer than the code is a problem line, and counts still pri
   const { code, body } = await cliJson(["status", "--orient"], house);
   assert.equal(code, 0);
   assert.deepEqual(body.problems.map((/** @type {any} */ p) => p.code), ["SCHEMA_NEWER"]);
-  assert.match(body.text, /^task 1: open 1\nSCHEMA_NEWER house\.toml: .*house\.schema = 99 is newer/);
+  assert.match(body.text, /^Open tasks \(1\):\n- T\nSCHEMA_NEWER house\.toml: .*house\.schema = 99 is newer/);
 });
 
 /** @param {string[]} ids @param {number} staleHours */
@@ -110,7 +177,7 @@ test("status --orient stays within 2,000 chars on a house with 5,000 tasks and 3
   assert.equal(body.cap, 2000);
   assert.ok([...body.text].length <= 2000, `${[...body.text].length} chars`);
   assert.deepEqual(body.counts.task, { open: 3000, active: 1500, done: 500 });
-  assert.equal(body.text.split("\n")[0], "task 5000: open 3000, active 1500, done 500");
+  assert.equal(body.text.split("\n")[0], "Open tasks (4500):");
   assert.ok(body.omitted > 0);
   assert.match(body.text, new RegExp(`\\n\\(${body.omitted} more lines left out; run lampstand status for all of them\\)$`));
   assert.equal(body.problems.length, 300);

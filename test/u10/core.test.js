@@ -136,6 +136,21 @@ test("projections: an edited input, a deleted projection, an edited region, and 
   assert.equal(unreadable.exit, 2);
 });
 
+test("projections: while compile refuses, doctor names the offending file as the fix, never lampstand compile alone", SLOW, (t) => {
+  const { env, root } = plantHouse(t);
+  // An adopted reflex with no falsified-when or revise: it parses, so only the compiler's curation rules refuse it.
+  plant(root, { "reflexes/no-trigger.md": '---\nscope: "behavioral"\nsummary: "x"\noccasion: "y"\nadopted: "2026-11-01"\nadopted-hash: "' + "0".repeat(64) + '"\n---\nx\n' });
+  const report = doctor(env, root);
+  const refused = report.findings.filter((finding) => finding.code === "COMPILE_REFUSED");
+  assert.equal(refused.length, 2, JSON.stringify(report.findings));
+  assert.match(refused[0].message, /^reflexes\/no-trigger\.md: reflex no-trigger carries no falsified-when trigger; lampstand compile refuses until it is fixed$/);
+  assert.equal(refused[0].fix, "correct reflexes/no-trigger.md");
+  for (const finding of report.findings.filter((candidate) => candidate.code.startsWith("PROJECTION_") || candidate.code === "REGION_STALE")) {
+    assert.equal(finding.fix, "correct reflexes/no-trigger.md, then lampstand compile", finding.code);
+  }
+  assert.equal(report.exit, 2);
+});
+
 test("budgets: a kernel over the host envelope", SLOW, (t) => {
   const { env, root } = plantHouse(t);
   const asks = Array.from({ length: 30 }, (_, k) => `"Ask before step ${k} of every release that touches the shared billing records."`);

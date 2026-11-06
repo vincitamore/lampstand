@@ -1,14 +1,37 @@
 manifest_version: 2
 name: lampstand
-version: 0.2.2
-description: "Plants a house: a git repository you own that holds your agent's principles, rules, tasks, decisions and knowledge as plain files."
+version: 0.3.0
+description: "Plants a house: a git repository you own that holds your agent's principles, rules, tasks, decisions and knowledge as plain files. In Hermes it is a whole cockpit: the house loads into every session started inside it, its work, inbox, knowledge and constitution are native tools, the desktop gets a House page with a lampstand of five lamps for its health, and Agora rooms wake the chats you bring into them."
 author: vincitamore
 license: MIT
 kind: standalone
+homepage: https://github.com/vincitamore/lampstand
+tags: [house, org, constitution, tasks, knowledge, agora, rooms, multi-agent, desktop]
 # First Hermes release whose install scan rates this plugin safe; 0.22.3 first reported the session's cwd and surface.
 requires_hermes: ">=0.22.6"
 provides_tools:
   - lampstand_delegate
+  - lampstand_house
+  - lampstand_tasks
+  - lampstand_inbox
+  - lampstand_knowledge
+  - lampstand_reminders
+  - lampstand_propose
+  - lampstand_room_post
+  - lampstand_room_read
+  - lampstand_room_listen
 provides_hooks:
   - pre_llm_call
+  - post_llm_call
   - pre_verify
+  - post_compaction
+  - post_gateway_admission
+config_schema:
+  houses_dir:
+    type: str
+    default: ""
+    description: "Folders the desktop's House page scans for houses, comma-separated. Empty means ~/houses and ~/Documents/houses. Houses your sessions work in are listed whatever this says."
+  agora_checkout:
+    type: str
+    default: ""
+    description: "The agora checkout to use for rooms, when the one behind the `agora` command is not it. Empty finds it from PATH."

@@ -13,6 +13,8 @@ import { loadHouse as loadJobsHouse } from "../governance/jobs.js";
 import { jobHealth } from "../governance/health.js";
 import { inputHash, KIND_DIRS, loadHouse as loadConstitution, markdownFiles, readInputs } from "../constitution/house.js";
 import { compileHouse, MANIFEST_FILE, readHeader } from "../constitution/compile.js";
+import { previousManifest } from "../constitution/budgets.js";
+import { KNOWN_GATES, runRules } from "../constitution/rules.js";
 import { readGenerated } from "../constitution/run.js";
 import { agentsRegionStale } from "../init/region.js";
 import { PLANTED_FILE, UPDATES_DIR } from "../init/plant.js";
@@ -40,7 +42,9 @@ import { attempt, commandRunner, isFile, isWithin, which } from "./util.js";
  *   expected: string[],
  *   surfaces: Record<string, { chars: number, cap: number }>,
  *   regionStale: boolean,
+ *   refused?: { path: string | null, message: string }[],
  * } | { ok: false, failure: Failure }} ConstitutionFacts
+ *   `refused` is every error-level curation finding, which makes lampstand compile refuse to write anything.
  * @typedef {{
  *   inputHash: string | Failure,
  *   files: { name: string, inputHash: string | null }[] | Failure,
@@ -187,18 +191,22 @@ function gatherHouse(root, env, now, schedulerHost, quick) {
   /** @type {ConstitutionFacts} */
   let constitution;
   const compiled = attempt(() => {
-    const result = compileHouse(loadConstitution(root));
-    return { result, regionStale: agentsRegionStale(root, result) };
+    const house = loadConstitution(root);
+    const result = compileHouse(house);
+    const findings = runRules({ house, compiled: result, previous: previousManifest(root), onDisk: null, gates: KNOWN_GATES });
+    const refused = findings.filter((finding) => finding.level === "error").map((finding) => ({ path: finding.path ?? null, message: finding.message }));
+    return { result, regionStale: agentsRegionStale(root, result), refused };
   });
   if ("failure" in compiled) {
     constitution = { ok: false, failure: compiled.failure };
   } else {
-    const { result, regionStale } = compiled.value;
+    const { result, regionStale, refused } = compiled.value;
     constitution = {
       ok: true,
       expected: result.files.map((file) => file.name),
       surfaces: Object.fromEntries(Object.entries(result.manifest.surfaces).map(([key, size]) => [key, { chars: size.chars, cap: size.cap }])),
       regionStale,
+      refused,
     };
   }
 
