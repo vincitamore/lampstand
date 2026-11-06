@@ -158,7 +158,7 @@ class Formatting(unittest.TestCase):
         self.assertEqual(chat_bearer("relay-house", "planner", "k"), "relay-house/planner")
         self.assertEqual(chat_bearer("relay-house", "  bad name!! ", "k"), "relay-house/bad-name")
         self.assertRegex(chat_bearer("relay-house", "", "k"), r"^relay-house/chat-[0-9a-f]{4}$")
-        self.assertEqual(chat_bearer("", "solo", "k"), "solo")
+        self.assertEqual(chat_bearer("", "solo", "k"), "hermes/solo")
         self.assertRegex(chat_bearer("relay-house", "planner", "k"), agora.BEARER_RE)
 
     def test_a_compacted_session_keeps_its_listens(self) -> None:

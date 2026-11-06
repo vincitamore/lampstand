@@ -312,8 +312,21 @@ const CSS = `
 .ls-hero:before{content:"";position:absolute;inset:-60px 0 -30px 0;z-index:-1;pointer-events:none;
   background:radial-gradient(ellipse 560px 260px at calc(100% - 230px) 40%,color-mix(in oklab,var(--ls-flame) 9%,transparent),transparent 70%),
   radial-gradient(ellipse 700px 220px at 10% -40px,color-mix(in oklab,var(--ls-accent) 8%,transparent),transparent 70%)}
-.ls-hero-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,430px);gap:var(--s6);align-items:center}
-@container lspage (max-width:900px){.ls-hero-grid{grid-template-columns:minmax(0,1fr)}.ls-lamp-panel{max-width:520px}}
+.ls-hero-grid{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(260px,300px);grid-template-areas:'mark text lamps';gap:var(--s5) var(--s6);align-items:center}
+.ls-hero-mark{grid-area:mark;width:208px}
+.ls-hero-text{grid-area:text}
+.ls-lamp-list{grid-area:lamps;display:flex;flex-direction:column;gap:1px;padding:var(--s2) var(--s2);border-radius:14px;border:1px solid var(--ls-soft);background:color-mix(in oklab,var(--ls-card) 55%,transparent)}
+.ls-lamp-list-head{display:flex;align-items:baseline;justify-content:space-between;padding:2px 8px 6px}
+.ls-lamp-list button{appearance:none;border:0;background:none;font:inherit;color:inherit;cursor:pointer;display:grid;grid-template-columns:12px auto minmax(0,1fr);align-items:center;gap:10px;padding:6px 8px;border-radius:8px;text-align:left;transition:background .15s}
+.ls-lamp-list button:hover,.ls-lamp-list button:focus-visible,.ls-lamp-list button[data-hot="1"]{background:color-mix(in oklab,var(--ui-text-primary) 6%,transparent);outline:none}
+.ls-lamp-list b{font-family:var(--ls-serif);font-variant:small-caps;letter-spacing:.04em;font-weight:500;font-size:13.5px;color:var(--ui-text-primary)}
+.ls-lamp-list span{font-size:11.5px;color:var(--ui-text-tertiary);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ls-lamp-list button[data-lit="0"] b{color:var(--ui-text-secondary)}
+.ls-lamp-list button[data-tone="bad"] span{color:color-mix(in oklab,var(--ls-red) 85%,var(--ui-text-primary))}
+.ls-lamp-list button[data-tone="warn"] span{color:color-mix(in oklab,var(--ls-yellow) 80%,var(--ui-text-primary))}
+.ls-lamp-compact{display:flex;flex-direction:column;gap:12px}.ls-lamp-compact .ls-hero-mark{width:140px;margin:0 auto}
+@container lspage (max-width:1100px){.ls-hero-grid{grid-template-columns:auto minmax(0,1fr);grid-template-areas:'mark text' 'lamps lamps'}.ls-lamp-list{display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}.ls-lamp-list-head{grid-column:1/-1}.ls-lamp-list button{grid-template-columns:12px minmax(0,1fr);row-gap:1px;align-items:start}.ls-lamp-list button svg{grid-row:1/3}.ls-lamp-list span{grid-column:2;text-align:left;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}}
+@container lspage (max-width:640px){.ls-hero-grid{grid-template-columns:minmax(0,1fr);grid-template-areas:'mark' 'text' 'lamps'}.ls-hero-mark{width:120px}}
 .ls-hero-text{min-width:0}
 .ls-eyebrow{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ui-text-tertiary);display:flex;gap:6px 14px;align-items:center;flex-wrap:wrap}
 .ls-eyebrow b{color:var(--ui-text-secondary);font-weight:600}
@@ -328,28 +341,28 @@ const CSS = `
 .ls-lamp-panel{position:relative;padding:var(--s3) var(--s3) var(--s2);border-radius:18px;border:1px solid var(--ls-soft);
   background:radial-gradient(ellipse 80% 70% at 50% 18%,color-mix(in oklab,var(--ls-flame) 7%,transparent),transparent 72%),color-mix(in oklab,var(--ls-card) 55%,transparent);
   box-shadow:0 1px 0 color-mix(in oklab,var(--ui-text-primary) 5%,transparent) inset,0 18px 40px -26px var(--ls-shade)}
-.ls-stand-svg{display:block;width:100%;height:auto;overflow:visible}
-.ls-stand-svg .metal{fill:none;stroke:var(--ls-brass);stroke-linecap:round}
-.ls-stand-svg .metal-fill{fill:var(--ls-brass)}
-.ls-stand-svg .cup{fill:var(--ls-brass);transition:fill .6s}
-.ls-l.on .cup{fill:color-mix(in oklab,var(--ls-brass) 70%,var(--ls-flame))}
-.ls-fl,.ls-bloom,.ls-ember{transform-box:fill-box;transform-origin:50% 100%}
-.ls-bloom{transform-origin:50% 50%;opacity:.9;animation:ls-breathe 4.8s ease-in-out infinite;transition:opacity .3s}
-.ls-l.hot .ls-bloom{opacity:1;transform:scale(1.18)}
-.ls-l.on .ls-fl{animation:ls-flicker 3.2s ease-in-out infinite}
-.ls-l.ignite .ls-fl{animation:ls-ignite 1.1s cubic-bezier(.2,.9,.3,1.25) both}
-.ls-l.ignite .ls-bloom{animation:ls-flash 1.4s ease-out both}
-.ls-wick{stroke:color-mix(in oklab,var(--ui-text-secondary) 80%,transparent);stroke-width:1.6;stroke-linecap:round}
-.ls-ember{fill:var(--ls-hot);opacity:.55;filter:drop-shadow(0 0 2px var(--ls-glow));animation:ls-ember 3.6s ease-in-out infinite}
-.ls-l.off.hot .ls-ember{opacity:.9}
-.ls-smoke{fill:none;stroke:color-mix(in oklab,var(--ui-text-tertiary) 45%,transparent);stroke-width:1;stroke-linecap:round;opacity:.0;animation:ls-smoke 7s ease-in-out infinite}
-.ls-l{cursor:pointer}
-@keyframes ls-flicker{0%,100%{transform:scale(1,1) skewX(0)}15%{transform:scale(.96,1.05) skewX(1.5deg)}33%{transform:scale(1.03,.97) skewX(-1deg)}52%{transform:scale(.98,1.03) skewX(.8deg)}74%{transform:scale(1.02,.99) skewX(-1.4deg)}}
-@keyframes ls-breathe{0%,100%{opacity:.78;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
-@keyframes ls-ignite{0%{transform:scale(.05,.05);opacity:0}45%{transform:scale(1.18,1.3);opacity:1}100%{transform:scale(1,1)}}
-@keyframes ls-flash{0%{opacity:0;transform:scale(.4)}35%{opacity:1;transform:scale(1.6)}100%{opacity:.9;transform:scale(1)}}
-@keyframes ls-ember{0%,100%{opacity:.35}50%{opacity:.7}}
-@keyframes ls-smoke{0%{opacity:0;transform:translateY(2px)}30%{opacity:.5}100%{opacity:0;transform:translateY(-10px)}}
+.ls-pix{display:block;width:100%;height:auto;overflow:visible;image-rendering:pixelated}
+.ls-pix-stand{fill:color-mix(in oklab,var(--ui-text-primary) 82%,transparent)}
+.ls-pl{cursor:pointer}
+.ls-pl-cup{fill:color-mix(in oklab,var(--ui-text-primary) 82%,transparent);transition:fill .6s}
+.ls-pl.on .ls-pl-cup{fill:color-mix(in oklab,var(--ui-text-primary) 70%,var(--ls-flame))}
+.ls-pl-flame{filter:drop-shadow(0 0 .45px var(--ls-flame)) drop-shadow(0 0 1.6px var(--ls-glow)) drop-shadow(0 0 3.4px var(--ls-glow));animation:ls-pix-breathe 3.6s ease-in-out infinite}
+.ls-hero-mark .ls-pl-flame{filter:drop-shadow(0 0 .35px var(--ls-flame)) drop-shadow(0 0 1.3px var(--ls-glow)) drop-shadow(0 0 3px var(--ls-glow)) drop-shadow(0 0 6px color-mix(in oklab,var(--ls-flame) 22%,transparent))}
+.ls-pix.small .ls-pl-flame{filter:drop-shadow(0 0 .7px var(--ls-glow))}
+.ls-pl-flame .body{fill:var(--ls-flame)}
+.ls-pl-flame .core{fill:var(--ls-core)}
+.ls-pl-flame .tip{fill:var(--ls-flame)}
+.ls-pl-flame .tip.a{animation:ls-pix-tip-a 1.9s steps(1,end) infinite}
+.ls-pl-flame .tip.b{opacity:0;animation:ls-pix-tip-b 1.9s steps(1,end) infinite}
+.ls-pl-wick{fill:color-mix(in oklab,var(--ui-text-tertiary) 75%,transparent)}
+.ls-pl.off .ls-pl-cup{fill:color-mix(in oklab,var(--ui-text-primary) 55%,transparent)}
+.ls-pl.hot .ls-pl-flame{filter:drop-shadow(0 0 .6px var(--ls-flame)) drop-shadow(0 0 2.4px var(--ls-glow)) drop-shadow(0 0 5px var(--ls-glow))}
+.ls-pl.off.hot .ls-pl-wick{fill:var(--ui-text-secondary)}
+.ls-pl.ignite .ls-pl-flame{animation:ls-pix-ignite 1.1s steps(6,end) both}
+@keyframes ls-pix-breathe{0%,100%{opacity:1}50%{opacity:.86}}
+@keyframes ls-pix-tip-a{0%,62%{opacity:1}63%,78%{opacity:0}79%,100%{opacity:1}}
+@keyframes ls-pix-tip-b{0%,62%{opacity:0}63%,78%{opacity:1}79%,100%{opacity:0}}
+@keyframes ls-pix-ignite{0%{opacity:0;transform:translateY(1px)}40%{opacity:1}100%{opacity:1;transform:none}}
 .ls-legend{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;margin-top:2px}
 .ls-legend button{appearance:none;border:0;background:none;font:inherit;color:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px 7px;border-radius:10px;min-width:0;transition:background .15s}
 .ls-legend button:hover,.ls-legend button:focus-visible,.ls-legend button[data-hot="1"]{background:color-mix(in oklab,var(--ui-text-primary) 5%,transparent);outline:none}
@@ -560,15 +573,13 @@ const CSS = `
 .ls-status{display:inline-flex;align-items:center;gap:6px;padding:0 8px;height:100%;font-size:11.5px;color:var(--ui-text-tertiary);background:none;border:0;cursor:pointer;font:inherit}
 .ls-status:hover{color:var(--ui-text-primary)}
 .ls-status svg{display:block;overflow:visible}
-.ls-status .ls-tiny-on{fill:var(--ls-flame);filter:drop-shadow(0 0 1.6px var(--ls-glow)) drop-shadow(0 0 3px var(--ls-glow))}
-.ls-status .ls-tiny-off{fill:color-mix(in oklab,var(--ui-text-tertiary) 70%,transparent)}
 .ls-status .ls-pill{min-width:16px;height:16px;padding:0 5px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ui-text-primary);background:color-mix(in oklab,var(--ls-accent) 26%,transparent);border:1px solid color-mix(in oklab,var(--ls-accent) 60%,transparent)}
 .ls-card-directive{max-width:660px;margin:6px 0;padding:14px 16px;border-radius:14px;border:1px solid var(--ls-line);background:color-mix(in oklab,var(--ls-card) 80%,transparent)}
 .ls-house-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;border-radius:10px;border:1px solid var(--ls-soft);margin-bottom:8px}
 .ls-seg{display:inline-flex;border:1px solid var(--ls-line);border-radius:9px;overflow:hidden}
 .ls-seg button{appearance:none;border:0;background:none;color:var(--ui-text-secondary);font:inherit;font-size:12px;padding:4px 10px;cursor:pointer}
 .ls-seg button[data-on="1"]{background:color-mix(in oklab,var(--ls-accent) 16%,transparent);color:var(--ui-text-primary)}
-@media (prefers-reduced-motion:reduce){.ls-l.on .ls-fl,.ls-l.ignite .ls-fl,.ls-bloom,.ls-l.ignite .ls-bloom,.ls-ember,.ls-smoke,.ls-shimmer,.ls-enter,.ls-reader,.ls-busy:before{animation:none}.ls-smoke{opacity:0}}
+@media (prefers-reduced-motion:reduce){.ls-pl-flame,.ls-pl-flame .tip,.ls-pl.ignite .ls-pl-flame,.ls-shimmer,.ls-enter,.ls-reader,.ls-busy:before{animation:none}.ls-smoke{opacity:0}}
 `
 
 function installStyle(ctx) {
@@ -584,10 +595,6 @@ function installStyle(ctx) {
 // -----------------------------------------------------------------------------------------------------------------
 // The five lamps: one lampstand of five branches, a lamp on each. A lit lamp is a check the house passes.
 
-let gradientSeq = 0
-const LAMP_X = [24, 72, 120, 168, 216]
-const FLAME_OUTER = 'M0,-34 C6,-24 10,-16 10,-8 C10,-1.5 5.5,2 0,2 C-5.5,2 -10,-1.5 -10,-8 C-10,-16 -6,-24 0,-34Z'
-const FLAME_INNER = 'M0,-21 C3.2,-15 5,-11 5,-6.5 C5,-2.8 2.8,-.8 0,-.8 C-2.8,-.8 -5,-2.8 -5,-6.5 C-5,-11 -3.2,-15 0,-21Z'
 
 function lampsOf(view) {
   if (!view) return null
@@ -656,133 +663,132 @@ function useIgnition(lit) {
   return igniting
 }
 
-function Lampstand({ lit = [true, true, true, true, true], hot = -1, igniting = [], onPick, onHover, names, width = '100%', title }) {
-  const ids = useMemo(() => {
-    const n = ++gradientSeq
-    return { flame: `ls-gf${n}`, core: `ls-gc${n}`, bloom: `ls-gb${n}`, metal: `ls-gm${n}` }
-  }, [])
+// The mark is lampstand's own: the five-branched stand of the lockup, drawn cell for cell from its pixel grid
+// (docs/assets/lampstand-lockup-dark.svg), so the page, the status bar and the README carry one mark. Each of its five
+// lamps is one check the house passes: lit, its pixel flame burns and glows; dark, only a cold wick shows.
+
+const STAND_CELLS =
+  'M1 5h2v4h-2zM7 5h2v4h-2zM13 5h2v4h-2zM19 5h2v4h-2zM25 5h2v4h-2zM1 9h2v3h-2zM7 9h14v2h-14zM25 9h2v3h-2zM13 11h2v1h-2zM1 12h26v2h-26zM13 14h2v4h-2zM7 18h14v2h-14z'
+const LAMP_COL = [1, 7, 13, 19, 25]
+// One flame: the lockup's three cells (a tip over a two-by-two body), plus a pale core cell and a second tip frame the
+// flicker alternates with.
+const flameBody = x => `M${x} 2h2v2h-2z`
+const flameTipA = x => `M${x + 1} 1h1v1h-1z`
+const flameTipB = x => `M${x} 1h1v1h-1z`
+const flameCore = x => `M${x} 3h1v1h-1z`
+const flameWick = x => `M${x + 1} 3h1v1h-1z`
+
+function Lampstand({ lit = [true, true, true, true, true], hot = -1, igniting = [], onPick, onHover, names, width = '100%', title, small = false }) {
   return h(
     'svg',
-    { className: 'ls-stand-svg', viewBox: '0 22 240 166', width, role: 'img', 'aria-label': title || `${lit.filter(Boolean).length} of 5 lamps lit` },
-    h(
-      'defs',
-      null,
-      h('radialGradient', { id: ids.flame, cx: '50%', cy: '78%', r: '78%' },
-        h('stop', { offset: '0%', style: { stopColor: 'var(--ls-core)' } }),
-        h('stop', { offset: '38%', style: { stopColor: 'var(--ls-flame)' } }),
-        h('stop', { offset: '80%', style: { stopColor: 'var(--ls-hot)', stopOpacity: 0.92 } }),
-        h('stop', { offset: '100%', style: { stopColor: 'var(--ls-hot)', stopOpacity: 0.35 } })),
-      h('radialGradient', { id: ids.core, cx: '50%', cy: '70%', r: '70%' },
-        h('stop', { offset: '0%', style: { stopColor: 'var(--ls-core)' } }),
-        h('stop', { offset: '100%', style: { stopColor: 'var(--ls-core)', stopOpacity: 0.15 } })),
-      h('radialGradient', { id: ids.bloom },
-        h('stop', { offset: '0%', style: { stopColor: 'var(--ls-flame)', stopOpacity: 0.5 } }),
-        h('stop', { offset: '45%', style: { stopColor: 'var(--ls-hot)', stopOpacity: 0.16 } }),
-        h('stop', { offset: '100%', style: { stopColor: 'var(--ls-hot)', stopOpacity: 0 } })),
-      h('linearGradient', { id: ids.metal, x1: 0, y1: 0, x2: 0, y2: 1 },
-        h('stop', { offset: '0%', style: { stopColor: 'var(--ls-brass)' } }),
-        h('stop', { offset: '100%', style: { stopColor: 'var(--ls-brass)', stopOpacity: 0.55 } }))
-    ),
-    // the stand
-    h('g', { style: { stroke: `url(#${ids.metal})` } },
-      h('path', { className: 'metal', d: 'M24,80 A96,72 0 0 0 216,80', strokeWidth: 3.4, style: { stroke: `url(#${ids.metal})` } }),
-      h('path', { className: 'metal', d: 'M72,80 A48,40 0 0 0 168,80', strokeWidth: 3.4, style: { stroke: `url(#${ids.metal})` } }),
-      h('path', { className: 'metal', d: 'M120,80 V168', strokeWidth: 4.4, style: { stroke: `url(#${ids.metal})` } })),
-    h('ellipse', { className: 'metal-fill', cx: 120, cy: 120, rx: 5, ry: 3.2 }),
-    h('ellipse', { className: 'metal-fill', cx: 120, cy: 152, rx: 5.5, ry: 3.4 }),
-    h('path', { className: 'metal-fill', d: 'M120,164 C113,171 101,175 86,178 Q84,181 88,182 H152 Q156,181 154,178 C139,175 127,171 120,164 Z', style: { fill: `url(#${ids.metal})` } }),
-    // the lamps
-    LAMP_X.map((x, i) =>
+    {
+      className: cls('ls-pix', small && 'small'), viewBox: '0 0 28 20', width, role: 'img', shapeRendering: 'crispEdges',
+      'aria-label': title || `${lit.filter(Boolean).length} of 5 lamps lit`
+    },
+    h('path', { className: 'ls-pix-stand', d: STAND_CELLS }),
+    LAMP_COL.map((x, i) =>
       h(
         'g',
         {
           key: i,
-          className: cls('ls-l', lit[i] ? 'on' : 'off', hot === i && 'hot', igniting.includes(i) && 'ignite'),
-          transform: `translate(${x},70)`,
+          className: cls('ls-pl', lit[i] ? 'on' : 'off', hot === i && 'hot', igniting.includes(i) && 'ignite'),
           onClick: onPick ? () => onPick(i) : undefined,
           onMouseEnter: onHover ? () => onHover(i) : undefined,
-          onMouseLeave: onHover ? () => onHover(-1) : undefined
+          onMouseLeave: onHover ? () => onHover(-1) : undefined,
+          style: { animationDelay: `${-i * 0.37}s` }
         },
         names && h('title', null, names[i]),
-        h('rect', { x: -22, y: -46, width: 44, height: 60, fill: 'transparent' }),
-        lit[i] && h('circle', { className: 'ls-bloom', cx: 0, cy: -14, r: 30, fill: `url(#${ids.bloom})` }),
-        h('path', { className: 'cup', d: 'M-11,2 H11 C11,7.5 6.5,10.5 0,10.5 C-6.5,10.5 -11,7.5 -11,2 Z' }),
+        h('rect', { x: x - 1.5, y: 0, width: 5, height: 9, fill: 'transparent' }),
+        h('path', { className: 'ls-pl-cup', d: `M${x} 5h2v1h-2z` }),
         lit[i]
-          ? h('g', { className: 'ls-fl', style: { animationDelay: `${-i * 0.63}s` } },
-              h('path', { d: FLAME_OUTER, fill: `url(#${ids.flame})` }),
-              h('path', { d: FLAME_INNER, fill: `url(#${ids.core})` }))
-          : h(Fragment, null,
-              h('line', { className: 'ls-wick', x1: 0, y1: 1.5, x2: 0.6, y2: -4.5 }),
-              h('circle', { className: 'ls-ember', cx: 0.6, cy: -5, r: 1.7, style: { animationDelay: `${-i * 0.9}s` } }),
-              h('path', { className: 'ls-smoke', d: 'M0.6,-8 C3,-12 -2,-15 0.8,-20', style: { animationDelay: `${-i * 1.4}s` } }))
+          ? h(
+              'g',
+              { className: 'ls-pl-flame', style: { animationDelay: `${-i * 0.37}s` } },
+              h('path', { className: 'body', d: flameBody(x) }),
+              h('path', { className: 'core', d: flameCore(x) }),
+              h('path', { className: 'tip a', d: flameTipA(x), style: { animationDelay: `${-i * 0.29}s` } }),
+              h('path', { className: 'tip b', d: flameTipB(x), style: { animationDelay: `${-i * 0.29}s` } })
+            )
+          : h('path', { className: 'ls-pl-wick', d: flameWick(x) })
       )
     )
   )
 }
 
-/** The status bar's five lamps: a tiny flame each, or a dim ember. */
+/** The status bar's mark: the same stand, small. */
 function TinyLamps({ lit }) {
-  return h(
-    'svg',
-    { viewBox: '0 0 36 14', width: 36, height: 14, 'aria-hidden': true },
-    lit.map((on, i) =>
-      on
-        ? h('path', { key: i, className: 'ls-tiny-on', transform: `translate(${4 + i * 7},12) scale(.3)`, d: FLAME_OUTER })
-        : h('circle', { key: i, className: 'ls-tiny-off', cx: 4 + i * 7, cy: 10.5, r: 1.3 })
-    )
-  )
+  return h('span', { style: { display: 'inline-flex', width: 22 } }, h(Lampstand, { lit, width: 22, small: true }))
 }
 
-/** A single oil lamp: the motif of every empty state. */
+/** A single lamp of the stand: the motif of every empty state. */
 function OneLamp({ lit = false, size = 54, center = true }) {
   return h(
     'div',
     { style: { width: size, flex: 'none', margin: center ? '0 auto' : 0 } },
     h(
       'svg',
-      { className: 'ls-stand-svg', viewBox: '96 30 48 56', width: size, 'aria-hidden': true },
-      h('path', { className: 'metal-fill', d: 'M104,72 H136 C136,80 128,84 120,84 C112,84 104,80 104,72 Z', style: { opacity: 0.75 } }),
-      h('path', { className: 'metal', d: 'M136,74 C142,74 143,68 139,66', strokeWidth: 2 }),
+      { className: 'ls-pix', viewBox: '-1 0 8 10', width: size, 'aria-hidden': true, shapeRendering: 'crispEdges' },
+      h('path', { className: 'ls-pix-stand', d: 'M2 5h2v3h-2zM0 8h6v2h-6z' }),
       h(
         'g',
-        { className: cls('ls-l', lit ? 'on' : 'off'), transform: 'translate(120,70)' },
+        { className: cls('ls-pl', lit ? 'on' : 'off') },
         lit
-          ? h('g', { className: 'ls-fl' }, h('path', { d: FLAME_OUTER, style: { fill: 'var(--ls-flame)' } }), h('path', { d: FLAME_INNER, style: { fill: 'var(--ls-core)' } }))
-          : h(Fragment, null, h('line', { className: 'ls-wick', x1: 0, y1: 1.5, x2: 0.6, y2: -4.5 }), h('circle', { className: 'ls-ember', cx: 0.6, cy: -5, r: 1.7 }), h('path', { className: 'ls-smoke', d: 'M0.6,-8 C3,-12 -2,-15 0.8,-20' }))
+          ? h('g', { className: 'ls-pl-flame' },
+              h('path', { className: 'body', d: flameBody(2) }), h('path', { className: 'core', d: flameCore(2) }),
+              h('path', { className: 'tip a', d: flameTipA(2) }), h('path', { className: 'tip b', d: flameTipB(2) }))
+          : h('path', { className: 'ls-pl-wick', d: flameWick(2) })
       )
     )
   )
 }
 
-function LampPanel({ lamps, onPick }) {
+/** One lamp's flame alone, for a legend row: lit, or a cold wick. */
+function LampFlame({ lit }) {
+  return h(
+    'svg',
+    { className: 'ls-pix', viewBox: '0 0 4 5', width: 12, height: 15, 'aria-hidden': true, shapeRendering: 'crispEdges', style: { width: 12, flex: 'none' } },
+    h('g', { className: cls('ls-pl', lit ? 'on' : 'off') },
+      h('path', { className: 'ls-pl-cup', d: 'M1 4h2v1h-2z' }),
+      lit
+        ? h('g', { className: 'ls-pl-flame' }, h('path', { className: 'body', d: flameBody(1) }), h('path', { className: 'core', d: flameCore(1) }), h('path', { className: 'tip a', d: flameTipA(1) }), h('path', { className: 'tip b', d: flameTipB(1) }))
+        : h('path', { className: 'ls-pl-wick', d: flameWick(1) }))
+  )
+}
+
+/** The five lamps: the house's mark, whose flames are its checks, and beside it the list that names each. Renders two
+ * children, the mark and the list, which the hero places in its own grid areas; `compact` stacks them. */
+function LampPanel({ lamps, onPick, compact = false }) {
   const [hot, setHot] = useState(-1)
   const list = lamps || []
   const lit = list.length ? list.map(l => l.lit) : [false, false, false, false, false]
   const igniting = useIgnition(lit)
   const count = lit.filter(Boolean).length
-  return h(
+  const rows = list.length ? list : ['Constitution', 'Health', 'Record', 'Work', 'Rooms'].map(name => ({ key: name, name, say: 'reading…', lit: false }))
+  const mark = h(
     'div',
-    { className: 'ls-lamp-panel' },
-    h(Lampstand, { lit, hot, igniting, onPick: i => list[i] && onPick(list[i]), onHover: setHot, names: list.map(l => `${l.name}: ${l.say}`) }),
-    h(
-      'div',
-      { className: 'ls-legend', role: 'list' },
-      (list.length ? list : ['Constitution', 'Health', 'Record', 'Work', 'Rooms'].map(name => ({ key: name, name, say: 'reading…', lit: false }))).map((l, i) =>
-        h(
-          'button',
-          {
-            key: l.key, type: 'button', role: 'listitem', 'data-lit': l.lit ? '1' : '0', 'data-tone': l.lit ? undefined : l.tone, 'data-hot': hot === i ? '1' : undefined,
-            title: `${l.name}: ${l.say}. ${l.lit ? 'Lit' : 'Dark'}; open its tab.`,
-            onMouseEnter: () => setHot(i), onMouseLeave: () => setHot(-1), onFocus: () => setHot(i), onBlur: () => setHot(-1),
-            onClick: () => list.length && onPick(l)
-          },
-          h('b', null, l.name),
-          h('span', null, l.say)
-        )
-      )
-    ),
-    h('div', { className: 'ls-lamp-caption' }, h('b', { className: 'ls-num' }, `${count} of 5 lit`), h('span', null, 'Each lamp is a check the house passes; click one to see why.'))
+    { className: 'ls-hero-mark', key: 'mark' },
+    h(Lampstand, { lit, hot, igniting, onPick: i => list[i] && onPick(list[i]), onHover: setHot, names: list.map(l => `${l.name}: ${l.say}`) })
   )
+  const legend = h(
+    'div',
+    { className: 'ls-lamp-list', key: 'list', role: 'list' },
+    h('div', { className: 'ls-lamp-list-head' }, h('span', { className: 'ls-label' }, 'The five lamps'), h('b', { className: 'ls-num' }, `${count} of 5 lit`)),
+    rows.map((l, i) =>
+      h(
+        'button',
+        {
+          key: l.key, type: 'button', role: 'listitem', 'data-lit': l.lit ? '1' : '0', 'data-tone': l.lit ? undefined : l.tone, 'data-hot': hot === i ? '1' : undefined,
+          title: `${l.name}: ${l.say}. ${l.lit ? 'Lit' : 'Dark'}; open its tab.`,
+          onMouseEnter: () => setHot(i), onMouseLeave: () => setHot(-1), onFocus: () => setHot(i), onBlur: () => setHot(-1),
+          onClick: () => list.length && onPick(l)
+        },
+        h(LampFlame, { lit: l.lit }),
+        h('b', null, l.name),
+        h('span', null, l.say)
+      )
+    )
+  )
+  return compact ? h('div', { className: 'ls-lamp-compact' }, mark, legend) : h(Fragment, null, mark, legend)
 }
 
 // -----------------------------------------------------------------------------------------------------------------
@@ -1081,9 +1087,8 @@ const dialogs = {
       title: 'Commit the house',
       subtitle: `${plural(count || 0, 'uncommitted change')} in the house's org folders and generated files become one commit. house.toml and anything else you keep in the house are left as they are.`,
       confirm: 'Commit',
-      fields: [{ name: 'message', label: 'Commit message', required: true, placeholder: 'What these changes are' }],
-      initial: { message: 'Record the house\'s org changes' },
-      run: v => act(root, 'record.commit', { message: v.message }, { inline: true })
+      fields: [{ name: 'message', label: 'Commit message', placeholder: 'Record the house\'s org changes' }],
+      run: v => act(root, 'record.commit', { message: (v.message || '').trim() || 'Record the house\'s org changes' }, { inline: true })
     })
   }
 }
@@ -2288,7 +2293,7 @@ function DirectiveCard({ attrs }) {
             h('div', { className: 'ls-item', key: i.path }, h(Dot, { status: i.status }), h('div', { className: 'ls-item-main' }, h('div', { className: 'ls-item-title' }, i.title || i.id), h('div', { className: 'ls-item-sub' }, i.kind)), i.kind === 'decision' && h(Btn, { size: 'xs', variant: 'secondary', onClick: () => dialogs.rule(root, i) }, 'Rule'))))
         : view === 'proposals'
           ? h('div', { className: 'ls-rows' }, (v.proposals || []).map(p => h('div', { className: 'ls-item', key: p.id }, h(Icon, { name: 'law' }), h('div', { className: 'ls-item-main' }, h('div', { className: 'ls-item-title' }, p.title || p.id)), h(Btn, { size: 'xs', onClick: () => open('constitution') }, 'Review'))))
-          : h('div', { style: { maxWidth: 420 } }, h(LampPanel, { lamps, onPick: l => open(l.tab) }))
+          : h('div', { style: { maxWidth: 420 } }, h(LampPanel, { lamps, compact: true, onPick: l => open(l.tab) }))
   return h(
     'div',
     { className: 'ls-tok', style: { height: 'auto' } },

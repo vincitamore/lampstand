@@ -1030,6 +1030,26 @@ def act(root: str, action: str, params: Mapping[str, Any], *, operator: bool) ->
         return _act(root, action, params, args, stdin_text, operator=operator)
 
 
+def committed(root: str, summary: str, run: Callable[[], dict]) -> dict:
+    """Runs `run` (a write outside the act list, such as a proposal) and commits exactly the paths it changed, as an
+    act would."""
+    root = checked_root(root)
+    with _act_lock(root):
+        found = _status(root)
+        marks = {p: _fingerprint(found[0], p) for p in found[1]} if found else {}
+        data = dict(run())
+        if data.get("ok") is not False and not data.get("refused") and found:
+            top, before = found
+            after = _status(root)
+            paths = _changed(before, marks, after[1], top) if after else []
+            sha, why = _commit(top, paths, summary) if paths else (None, None)
+            data["commit"] = sha
+            if why:
+                data["commit_error"] = why
+        forget_cache(root, keep=_KEEP_AFTER_ORG_ACT)
+        return data
+
+
 _act_locks: dict[str, threading.Lock] = {}
 _act_locks_guard = threading.Lock()
 
@@ -1050,7 +1070,8 @@ def _act(root: str, action: str, params: Mapping[str, Any], args: list[str], std
     data = dict(data)
     if data.get("ok") is False:
         message = _message(data.get("error")) or _message(data.get("text")) or f"{action} was refused"
-        data["message"] = message
+        # The CLI names its flags; here the reason is read by a person or a model, who give a resolution, not a flag.
+        data["message"] = re.sub(r'--resolution\s*("<([^>]*)>")?', lambda m: f"a resolution ({m.group(2)})" if m.group(2) else "a resolution", message)
     elif writes:
         summary = describe(action, params, data, root)
         if not str(data.get("text") or "").strip():

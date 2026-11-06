@@ -391,9 +391,11 @@ def delivery_text(room: str, messages: list[dict], *, relay: bool = False) -> st
             used += len(line) + 1
         else:
             rest.append(message["id"])
-    out = [relay_preamble(room) if relay else preamble(room), *lines]
+    # The room's words first: a chat shows the start of the turn, and the framing is what may be cut, never the message.
+    out = [*lines]
     if rest:
         out.append(f"{len(rest)} more in {room} not shown here (ids {', '.join(r[:12] for r in rest[:8])}); read them with lampstand_room_read.")
+    out += ["", relay_preamble(room) if relay else preamble(room)]
     return "\n".join(out)
 
 
@@ -467,6 +469,27 @@ def route_key_for(session: str) -> str:
     return session
 
 
+def session_title(route_key: str) -> str:
+    """The chat's title from the profile's session store (read-only), "" when it has none."""
+    try:
+        import sqlite3
+
+        db = hermes_home() / "state.db"
+        if not route_key or not db.is_file():
+            return ""
+        connection = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True, timeout=2.0)
+        try:
+            row = connection.execute(
+                "select title from sessions where session_key = ? or id = ? order by started_at desc limit 1",
+                (route_key, route_key.rsplit(":", 1)[-1]),
+            ).fetchone()
+        finally:
+            connection.close()
+        return str(row[0])[:120] if row and row[0] else ""
+    except Exception:
+        return ""
+
+
 def start_listen(session_key: str, room: str, *, wake: str = DEFAULT_WAKE, bearer: str = "", house: str = "",
                  title: str = "", from_start: bool = False, relay: bool = False) -> dict:
     """Binds `session_key` to `room` (replacing an earlier binding of the same pair). Returns the listen.
@@ -483,6 +506,7 @@ def start_listen(session_key: str, room: str, *, wake: str = DEFAULT_WAKE, beare
     if bearer and not BEARER_RE.match(bearer):
         raise ValueError(f"{bearer!r} is not a bearer name (letters, digits, . _ - and one /)")
     agora_session = agora_session_key(session_key)
+    title = title or session_title(session_key)
     earlier = any(_same(item, session_key, room) for item in load_listens())
     if not earlier and not from_start:
         try:

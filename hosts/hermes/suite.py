@@ -280,7 +280,10 @@ class Suite:
         try:
             with open(path, "w", encoding="utf-8", newline="\n") as handle:
                 handle.write(draft.strip() + "\n")
-            data = cockpit.cli(root, "propose", kind, path, "--occasion", occasion.strip()[:400], operator=False)
+            data = cockpit.committed(
+                root, f"Propose {kind} {slug}",
+                lambda: cockpit.cli(root, "propose", kind, path, "--occasion", occasion.strip()[:400], operator=False),
+            )
         finally:
             try:
                 os.remove(path)
@@ -290,7 +293,7 @@ class Suite:
         if not data.get("ok") or data.get("refused"):
             return _fail(data, template=self._template(root, str(kind)))
         broadcast("house.changed", {"root": root, "act": "propose"})
-        return _ok(path=data.get("path"), text=data.get("text"), card=card("proposals", root=root))
+        return _ok(path=data.get("path"), text=data.get("text"), commit=data.get("commit"), card=card("proposals", root=root))
 
     def _template(self, root: str, kind: str) -> str | None:
         """The smallest valid file of this kind, as `lampstand propose <kind> --help` shows it."""
@@ -395,7 +398,8 @@ def chat_bearer(house: str, name: str, key: str) -> str:
     name = NAME_RE.sub("-", name.strip()).strip("-._")[:32]
     if not name:
         name = "chat-" + agora.agora_session_key(key or "unknown")[-4:]
-    if name.lower() == house.lower() or not house:
+    house = house or "hermes"
+    if name.lower() == house.lower():
         return name
     return f"{house}/{name}"
 
