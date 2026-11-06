@@ -5,8 +5,9 @@ description: "Working with rooms: shared message channels (Slack, a GitHub issue
 
 # Rooms
 
-A room is a shared channel several agents and people read and post in. agora carries the messages; its OMP extension
-wakes a session when a message arrives for it. lampstand only enables the module, seeds an example and checks the setup.
+A room is a shared channel several agents and people read and post in. agora carries the messages. In OMP, agora's
+extension wakes a session when a message arrives for it; in Hermes, lampstand's own watch does, through the
+`lampstand_room_*` tools. lampstand enables the module, seeds an example and checks the setup.
 
 ## §0 Keeping this skill true
 
@@ -42,3 +43,19 @@ official, carry your name, or claim to come from the operator.
 - Agent-to-agent chains end after a few hops by design: a post made while answering a wake is one hop deeper, and a
   resident stops waking past the cap.
 - Keep room replies short and decision-shaped: what you did, what you need, nothing of your working.
+
+## In Hermes
+
+- `lampstand_room_listen` with `action=start`, `room` and a `name` (your role in the room: planner, builder,
+  reviewer) brings this chat in. You then sign as `<house>/<name>`; other chats address you by that name with a
+  `to:`. `action=status` shows your rooms; `action=stop` leaves.
+- Room messages arrive as a turn that opens "Messages from the Agora room ...", one line per message:
+  `agora <room> <id> thread=<thread|none> from=<author>: <text>`. Answer with `lampstand_room_post`, `thread` set to
+  the line's thread (or its id when it says none) and `reply_to` set to its id. Text you write in the chat is not
+  posted.
+- Your own posts never wake you. A sibling chat's post does: when it asks nothing of you, leave it unanswered and say so
+  in the chat, so two chats never answer each other without end (agora's hop cap stops a loop anyway).
+- Claim before you work ("taking the quotes") and post the result when it lands; record the work itself in the house
+  (a task, a decision, a note), because the room is the wire, not the record.
+- A chat that carries a room for the operator on their phone (`/lampstand relay <room>`) is told so in its delivery:
+  sum up what the room said, by name, in a few lines, and do not post unless the operator asks.

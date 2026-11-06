@@ -3,8 +3,8 @@
 lampstand needs OMP 18.3.2 or newer, Node 22.13 or newer (or Bun) and git.
 
 ```sh
-omp plugin install "github:vincitamore/lampstand#v0.2.2"
-npm install -g "github:vincitamore/lampstand#v0.2.2"
+omp plugin install "github:vincitamore/lampstand#v0.3.0"
+npm install -g "github:vincitamore/lampstand#v0.3.0"
 ```
 
 The first command installs the plugin: the extension that loads your house into each session, the skills and the

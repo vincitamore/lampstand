@@ -1,0 +1,7 @@
+{
+  "name": "lampstand",
+  "label": "lampstand",
+  "description": "The house cockpit: a lampstand house's work, constitution, rhythm, health and Agora rooms.",
+  "tab": { "hidden": true },
+  "api": "plugin_api.py"
+}

@@ -7,7 +7,7 @@
 // house names as not items are not linted as items, but their links are checked. Fields are read under the names
 // each kind's items give them.
 import { indexFiles, isExternalLink, resolveTarget, walkHouse } from "./links.js";
-import { findLinks, keyLine, utcDate } from "./markdown.js";
+import { findLinks, keyLine, localDate } from "./markdown.js";
 import { fieldName, isTerminal, placeFor } from "./schema.js";
 import { scanOrg, statusOf, stemOfItem, titleOf } from "./items.js";
 
@@ -54,7 +54,7 @@ function hasField(item, field, schema) {
 export function lintOrg(root, schema, options = {}) {
   const { items, notes } = scanOrg(root, schema);
   const index = indexFiles(walkHouse(root));
-  const today = utcDate(options.now);
+  const today = localDate(options.now);
   /** @type {LintFinding[]} */
   const findings = [];
   /** @param {string} path @param {string} text */

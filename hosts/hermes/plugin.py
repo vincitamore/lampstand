@@ -16,17 +16,23 @@ import json
 import logging
 import os
 import re
+import subprocess
+import sys
 import threading
+import time
 from collections import OrderedDict
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from . import agora
+from .cockpit import remember_house
 from .context import house_region_loads
 from .node import CliFailed, NodeMissing, run_cli
 from .projection import ProjectionError, projection_path, read_projection
 from .rooms import mark_room_actor
 from .root import LampstandError, Resolution, read_text, resolve_house
+from .suite import TOOL_NAMES, Suite, broadcast, register_tools, session_key, slash
 
 logger = logging.getLogger("lampstand")
 
@@ -166,6 +172,9 @@ class Adapter:
         self._node_reported = False
         self._changed: OrderedDict[str, set[str]] = OrderedDict()
         self._reminded: OrderedDict[str, bool] = OrderedDict()
+        # Where each session started: the house's HEAD and the time, so the gate also sees what the session changed
+        # through the shell (git reports it), not only through Hermes's file tools.
+        self._started: OrderedDict[str, tuple[str, int]] = OrderedDict()
 
     # Session facts (present from the plugin.yaml floor). A surface that reports no cwd falls back to the process's.
 
@@ -196,7 +205,7 @@ class Adapter:
             return ""
         if found.root is None:
             return ""
-        mark_room_actor(found.root)
+        _mark_actor(platform, found.root)
         return kernel_section(found.root, cwd)
 
     # The first turn's orientation.
@@ -218,8 +227,18 @@ class Adapter:
             )
         return notices, projection.notice
 
-    def pre_llm_call(self, is_first_turn: bool = False, platform: str = "", **_: Any) -> dict | None:
-        if not is_first_turn or platform == SUBAGENT:
+    def pre_llm_call(self, is_first_turn: bool = False, platform: str = "", **kwargs: Any) -> dict | None:
+        if platform == SUBAGENT:
+            return None
+        # A session taking a turn in this process owns its room listens here (a restarted gateway takes them back).
+        key = session_key(kwargs)
+        if key:
+            try:
+                agora.adopt_session(key)
+                agora.turn_started(key, str(kwargs.get("user_message") or ""))
+            except OSError as error:
+                logger.warning("lampstand rooms: %s", error)
+        if not is_first_turn:
             return None
         cwd = self._session_cwd()
         try:
@@ -229,7 +248,12 @@ class Adapter:
         if found.root is None:
             # Outside a house the plugin is silent: a global install would otherwise speak in every session.
             return None
-        mark_room_actor(found.root)
+        _mark_actor(platform or self._session_platform(), found.root)
+        self._start(str(kwargs.get("session_id") or ""), found.root)
+        try:
+            remember_house(found.root)
+        except OSError:
+            pass
         notices, stale = self._kernel_notices(found.root, cwd)
         orientation = ""
         try:
@@ -253,6 +277,69 @@ class Adapter:
         lines = [f"lampstand house {found.root}:", *notices, *([orientation] if orientation else [])]
         return {"context": "\n".join(lines)}
 
+    # The end of a turn: a post the model makes after this is its own, no longer an answer to a room wake.
+
+    def post_llm_call(self, platform: str = "", **kwargs: Any) -> None:
+        if platform == SUBAGENT:
+            return None
+        key = session_key(kwargs)
+        if key:
+            agora.turn_ended(key)
+        return None
+
+    def post_gateway_admission(self, session_key: str = "", text: str = "", **_: Any) -> dict | None:
+        """A message the person typed in a chat that relays a room goes into the room as their own words, and the agent
+        turn is skipped. Hermes calls this only after its own authorization, so only people allowed to talk to this
+        Hermes on that platform can post. Slash commands always reach Hermes."""
+        if not session_key or not text or text.lstrip().startswith("/"):
+            return None
+        try:
+            if agora.relay_listen(session_key) is None:
+                return None
+            result = agora.relay_post(session_key, text)
+        except OSError as error:
+            return {"action": "handled", "reply": f"lampstand: the room could not be reached: {error}"}
+        if not result.get("ok"):
+            return {"action": "handled", "reply": f"lampstand: not posted to {result.get('room', 'the room')}: "
+                    f"{result.get('error')}"}
+        broadcast("room.posted", {"room": result["room"]})
+        return {"action": "handled", "reply": f"Posted to {result['room']}."}
+
+    def post_compaction(self, session_id: str = "", old_session_id: str = "", **_: Any) -> None:
+        """A compacted session carries on under a new id: its room listens and its gate baseline follow it."""
+        if old_session_id and session_id and old_session_id != session_id:
+            try:
+                moved = agora.rekey(old_session_id, session_id)
+                if moved:
+                    logger.info("lampstand rooms: %d listen(s) followed %s to %s", moved, old_session_id, session_id)
+            except OSError as error:
+                logger.warning("lampstand rooms: %s", error)
+            with self._lock:
+                if old_session_id in self._started:
+                    self._started[session_id] = self._started[old_session_id]
+                    _remember(self._started, session_id)
+        return None
+
+    def _start(self, session_id: str, root: str) -> None:
+        """Records where a session started in the house (its HEAD, empty before the first commit, and the time)."""
+        if not session_id:
+            return
+        with self._lock:
+            if session_id in self._started:
+                return
+        head = ""
+        try:
+            done = subprocess.run(
+                ["git", "-C", root, "rev-parse", "HEAD"], capture_output=True, text=True, timeout=10, check=False,
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+            )
+            head = done.stdout.strip() if done.returncode == 0 else ""
+        except (OSError, subprocess.SubprocessError):
+            return
+        with self._lock:
+            self._started[session_id] = (head, int(time.time() * 1000))
+            _remember(self._started, session_id)
+
     # The maintenance gate.
 
     def pre_verify(
@@ -267,7 +354,8 @@ class Adapter:
             changed.update(fresh)
             _remember(self._changed, session_id)
             paths = sorted(changed)
-        if not paths:
+            started = self._started.get(session_id)
+        if not paths and started is None:
             return None
         try:
             found = resolve_house(cwd, workspace=has_workspace(platform or self._session_platform()))
@@ -276,8 +364,9 @@ class Adapter:
             return None
         if found.root is None:
             return None
+        since = ["--since", started[0], "--since-time", str(started[1])] if started is not None else []
         try:
-            result = run_cli(["gate", *paths], found.root)
+            result = run_cli(["gate", *since, *paths], found.root)
         except NodeMissing:
             if self._node_notice():
                 logger.warning(NODE_MISSING)
@@ -330,6 +419,9 @@ class Adapter:
         except LampstandError as error:
             found = Resolution("dormant", None)
             notices.append(f"lampstand: {error}")
+        if found.root is None and not notices:
+            notices.append("lampstand: this session is not in a house, so the subagent carries the role brief only, "
+                           "without a house's worker projection")
         if found.root is not None:
             try:
                 projection = read_projection(found.root, WORKER_PROJECTION)
@@ -394,6 +486,31 @@ def _tool_result(ok: bool, **fields: Any) -> str:
     return json.dumps({"ok": ok, **{k: v for k, v in fields.items() if v not in (None, [])}}, ensure_ascii=False)
 
 
+def _mark_actor(platform: str, root: str) -> None:
+    """Names the house in AGORA_ACTOR for the agent's own `agora` commands, only where the process serves one session
+    (the classic CLI). A gateway serves many sessions in one environment, so there it never sets a process-wide
+    actor: lampstand's room tools pass each chat's own name per call."""
+    if platform == "cli":
+        mark_room_actor(root)
+
+
+SKILLS_DIR = Path(__file__).resolve().parents[2] / "skills"
+
+
+def register_skills(ctx: Any) -> None:
+    """The bundled skills (house, rooms, curate, distill, ...) as `lampstand:<name>`, loaded on demand like any skill."""
+    register = getattr(ctx, "register_skill", None)
+    if not callable(register) or not SKILLS_DIR.is_dir():
+        return
+    for child in sorted(SKILLS_DIR.iterdir()):
+        skill = child / "SKILL.md"
+        if child.is_dir() and skill.is_file():
+            try:
+                register(child.name, skill)
+            except (ValueError, FileNotFoundError) as error:
+                logger.warning("lampstand: skill %s not registered: %s", child.name, error)
+
+
 def register(ctx: Any) -> None:
     # Marks the agent's environment: Hermes's terminal tool passes through every name that is not a credential, and
     # `lampstand adopt` refuses principles and provisions from a shell that carries this one.
@@ -401,7 +518,10 @@ def register(ctx: Any) -> None:
     adapter = Adapter(ctx)
     ctx.register_system_prompt_section(SECTION_ID, adapter.section, max_chars=SECTION_MAX_CHARS)
     ctx.register_hook("pre_llm_call", adapter.pre_llm_call)
+    ctx.register_hook("post_llm_call", adapter.post_llm_call)
     ctx.register_hook("pre_verify", adapter.pre_verify)
+    ctx.register_hook("post_compaction", adapter.post_compaction)
+    ctx.register_hook("post_gateway_admission", adapter.post_gateway_admission)
     ctx.register_tool(
         name=DELEGATE_TOOL,
         toolset="lampstand",
@@ -409,3 +529,15 @@ def register(ctx: Any) -> None:
         handler=adapter.delegate,
         description="Delegate a bounded task to a subagent under a lampstand role and the house's worker projection.",
     )
+    suite = Suite(ctx, adapter._session_cwd, adapter._session_platform)
+    register_tools(ctx, suite)
+    register_skills(ctx)
+    ctx.register_command(
+        "lampstand",
+        lambda raw="", **context: slash(ctx, suite, raw, **context),
+        description="The house: status, doctor, compile, adopt, tasks, inbox, rooms, listen",
+        args_hint="status|doctor|compile|adopt|tasks|inbox|rooms|listen <room> [name]|unlisten",
+    )
+    # The room watch is bound now and started only when a listen exists (a tool call, the desktop, or a session that
+    # resumes here with one): registration itself starts no thread and spawns nothing.
+    agora.WATCHER.bind(lambda key, text: bool(ctx.inject_message(text, session_key=key)), broadcast)

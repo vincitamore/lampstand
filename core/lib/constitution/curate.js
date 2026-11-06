@@ -5,13 +5,17 @@
 // from being proposed again until its text changes.
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fail } from "../errors.js";
+import { fail, isLampstandError } from "../errors.js";
 import { parseFrontmatter } from "../frontmatter.js";
+import { validate } from "../config.js";
 import { atomicWrite, contentHash, readText } from "../io.js";
+import { localDate } from "../org/markdown.js";
 import { chars, surfaceOf } from "./budgets.js";
 import { compileHouse } from "./compile.js";
+import { PROPOSAL_EXAMPLES } from "./examples.js";
 import { KIND_DIRS, loadHouse } from "./house.js";
-import { parsePrincipleText, parseProvisionText, parseReflexText } from "./parse.js";
+import { parsePrincipleText, parseProvisionText, parseReflexText, SCHEMAS } from "./parse.js";
+import { CURATION_RULES, KNOWN_GATES } from "./rules.js";
 
 /** @typedef {import("./parse.js").Kind} Kind */
 /** @typedef {import("./parse.js").Frontmatter} Frontmatter */
@@ -30,11 +34,8 @@ function parseKind(kind, text, path, standing) {
   return parseReflexText(text, path, standing);
 }
 
-/** The local calendar date as YYYY-MM-DD. @param {Date} [now] */
-export function today(now = new Date()) {
-  const pad = (/** @type {number} */ n) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
+/** The local calendar date as YYYY-MM-DD; the org's own helper, so every dated act shares one "today". */
+export const today = localDate;
 
 /**
  * Frontmatter in the strict YAML subset: every string double-quoted (JSON string escapes are YAML escapes), arrays as
@@ -218,6 +219,136 @@ function checkProposalName(name, path) {
 }
 
 /**
+ * The keys propose and adopt write themselves; an author's value for one is replaced, never checked.
+ */
+const SET_BY_LAMPSTAND = Object.freeze(["occasion", "proposed", "adopted", "adopted-hash"]);
+
+/** The curation rules that judge one item on its own text, run on a draft as the compiler runs them on the house. */
+const ITEM_RULES = Object.freeze(["failure-mode", "reflex-revisable", "provision-gates"]);
+
+/**
+ * A parser's reason without the `path:line:` it leads with: in a draft's refusal every problem is the draft's own,
+ * and a line counted in the text propose rebuilt would not be the author's line.
+ * @param {import("../errors.js").LampstandError} error
+ * @param {boolean} [keepLine]  the error was raised on the author's own text, so its line is theirs
+ */
+function reasonOf(error, keepLine = false) {
+  if (error.path === undefined) return error.message;
+  const where = error.line === undefined ? `${error.path}: ` : `${error.path}:${error.line}: `;
+  const reason = error.message.startsWith(where) ? error.message.slice(where.length) : error.message;
+  return keepLine && error.line !== undefined ? `line ${error.line}: ${reason}` : reason;
+}
+
+/**
+ * Every reason a draft of `kind` would be refused at propose, adopt or the compile after it, in one list (empty when
+ * it would pass): the frontmatter against the kind's schema (each missing required key, each unknown key, each bad
+ * value), the body's structure, and the item-level curation rules.
+ * @param {Kind} kind
+ * @param {string} text  the draft as the author wrote it
+ * @param {string} path  where it would be filed, named in parser messages
+ * @returns {string[]}
+ */
+export function draftProblems(kind, text, path) {
+  /** @type {string[]} */
+  const problems = [];
+  let parsed;
+  try {
+    parsed = parseFrontmatter(text, path);
+  } catch (error) {
+    if (!isLampstandError(error)) throw error;
+    return [reasonOf(error, true)];
+  }
+  const frontmatter = parsed.frontmatter ?? {};
+  const schema = SCHEMAS[kind];
+  const properties = /** @type {Record<string, import("../config.js").Schema>} */ (schema.properties ?? {});
+  // Adopt adds `origin: own` to a principle that names none.
+  const required = (schema.required ?? []).filter((key) => !SET_BY_LAMPSTAND.includes(key) && !(kind === "principle" && key === "origin"));
+  if (parsed.frontmatter === null && required.length > 0) problems.push(`a ${kind} draft must open with a frontmatter block (--- lines)`);
+  const missing = required.filter((key) => frontmatter[key] === undefined);
+  if (missing.length > 0) problems.push(`frontmatter is missing ${missing.map((key) => `\`${key}\``).join(", ")}`);
+  /** @type {Frontmatter} */
+  const valid = {};
+  for (const [key, value] of Object.entries(frontmatter)) {
+    if (SET_BY_LAMPSTAND.includes(key)) continue;
+    if (!Object.hasOwn(properties, key)) {
+      const known = Object.keys(properties).filter((name) => !SET_BY_LAMPSTAND.includes(name));
+      problems.push(`frontmatter key \`${key}\` is not one a ${kind} carries (${known.join(", ")})`);
+      continue;
+    }
+    try {
+      validate({ type: "object", properties: { [key]: properties[key] } }, { [key]: value }, path);
+      valid[key] = value;
+    } catch (error) {
+      if (!isLampstandError(error)) throw error;
+      problems.push(reasonOf(error));
+    }
+  }
+  // The body is parsed under a frontmatter that is valid by construction, so a body fault is reported beside the
+  // frontmatter faults rather than hidden behind the first of them.
+  /** @type {Frontmatter} */
+  const stand = kind === "reflex" ? { scope: "behavioral", summary: "draft", ...valid, proposed: "2000-01-01" } : { ...valid, proposed: "2000-01-01" };
+  let item;
+  try {
+    item = parseKind(kind, `${renderFrontmatter(stand)}${parsed.body}`, path, "proposal");
+  } catch (error) {
+    if (!isLampstandError(error)) throw error;
+    problems.push(reasonOf(error));
+    if (kind === "principle") problems.push(...principleShape(parsed.body, error.message));
+    return problems;
+  }
+  const house = /** @type {any} */ ({
+    proposals: [],
+    principleFiles: kind === "principle" ? [item] : [],
+    provisions: kind === "provision" ? [item] : [],
+    reflexes: kind === "reflex" ? [item] : [],
+  });
+  for (const rule of CURATION_RULES.filter((candidate) => ITEM_RULES.includes(candidate.id))) {
+    for (const finding of rule.check(/** @type {any} */ ({ house, gates: KNOWN_GATES }))) {
+      if (finding.level === "error") problems.push(finding.message);
+    }
+  }
+  return problems;
+}
+
+/**
+ * What else a principle body lacks once the parser has refused it for `already`: the parser stops at its first fault,
+ * so the remaining parts of the shape are looked for directly.
+ * @param {string} body
+ * @param {string} already  the parser's message
+ */
+function principleShape(body, already) {
+  const lines = body.split("\n").map((line) => line.trim());
+  const out = [];
+  if (!/heading/.test(already) && !lines.some((line) => /^### \S(?:.*\S)? : \S/.test(line))) {
+    out.push("a principle file must hold at least one heading of the form `### <mark> : <Name>`");
+  }
+  if (!/thesis/.test(already) && !lines.some((line) => /^\*(?!\*)(?!Kernel:\*|Vice:\*|Failure mode:\*).*[^*\s]\*$/.test(line))) {
+    out.push("a principle must open with an italic thesis paragraph (*...*)");
+  }
+  if (!/facets/.test(already) && !lines.some((line) => /^[-*] \*\*.+?\*\*:[ \t]+\S/.test(line))) {
+    out.push("a principle must list its facets as `- **<facet>**: <text>` bullets");
+  }
+  if (!lines.some((line) => /^\*(Vice|Failure mode):\*/.test(line))) out.push("a principle needs a `*Failure mode:*` (or `*Vice:*`) paragraph");
+  return out;
+}
+
+/**
+ * The refusal for a draft with problems: each problem, then the shape a draft of the kind takes.
+ * @param {Kind} kind
+ * @param {string[]} problems
+ */
+export function draftRefusal(kind, problems) {
+  const example = PROPOSAL_EXAMPLES[kind];
+  return [
+    `the draft is not a ${kind} lampstand can adopt (${problems.length} problem${problems.length === 1 ? "" : "s"}):`,
+    ...problems.map((problem) => `- ${problem}`),
+    `A ${kind} draft looks like this (propose adds occasion and proposed itself):`,
+    ...example.text.trimEnd().split("\n").map((line) => `    ${line}`),
+    ...example.notes,
+  ].join("\n");
+}
+
+/**
  * Files a proposal from a draft. The draft's own frontmatter is kept except the keys propose and adopt set; the
  * occasion and proposed date are added. A draft already written at its destination, with no occasion yet, is
  * finalized in place; one that carries an occasion is already proposed. Returns the proposal's house-relative path, or
@@ -232,9 +363,14 @@ function checkProposalName(name, path) {
 export function propose(root, kind, draftPath, occasion, date) {
   const name = draftPath.split(/[\\/]/).pop() ?? "";
   checkProposalName(name, draftPath);
-  const parsed = parseFrontmatter(readText(draftPath), draftPath);
+  const raw = readText(draftPath);
   const destRel = `${KIND_DIRS[kind].proposals}/${name}`;
   const dest = full(root, destRel);
+  // Every check adoption and the compiler would apply to this item, all at once: a draft that passes here is one
+  // adopt can take, and an author fixes every field in one pass rather than one refusal at a time.
+  const problems = draftProblems(kind, raw, dest);
+  if (problems.length > 0) throw fail("E_SCHEMA", draftRefusal(kind, problems), { path: draftPath });
+  const parsed = parseFrontmatter(raw, draftPath);
   /** @type {Frontmatter} */
   const frontmatter = {};
   for (const [key, value] of Object.entries(parsed.frontmatter ?? {})) {

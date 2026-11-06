@@ -1,6 +1,7 @@
 // @ts-check
 // The CLI contract for every verb: `lampstand <verb> [args] [--json]`. With --json, stdout is exactly one JSON object
-// whose first key is `ok`. Exit codes: 0 clean, 1 actionable finding, 2 could not run, 64 usage, 70 internal.
+// whose first key is `ok`, and which carries the human reading as `text` (a failure: `error` and `message`). Exit
+// codes: 0 clean, 1 actionable finding, 2 could not run, 64 usage, 70 internal.
 // Verbs are registered into a Registry; dispatch never names a verb, so adding one is a register() call.
 import { readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
@@ -99,19 +100,25 @@ function verbUsage(verb, args = [], registry) {
     ([name, spec]) => `  --${name}${spec.type === "string" ? " <value>" : ""}  ${spec.summary}`,
   );
   flags.push("  --json  print one JSON object whose first key is ok");
+  if (verb.args && verb.args.max > 0) flags.push("  --  end of flags: every argument after it is taken as written, even one that starts with -");
   const subs = registry?.group([verb.name]);
   const more = `${verb.more ? `\n\n${verb.more(args)}` : ""}${subs ? `\n\n${subs.text.slice(subs.text.indexOf("subcommands:"))}` : ""}`;
   return `usage: lampstand ${verb.name}${verb.args ? ` ${verb.args.usage}` : ""} [flags]\n\n${verb.summary}\n\nflags:\n${flags.join("\n")}${more}`;
 }
 
 /**
- * Splits argv into words and flags. `--name=value` and `--name value` both set string flags; `--` ends flags.
+ * Splits argv into words and flags. `--name=value` and `--name value` both set string flags; `--` ends flags, so
+ * every token after it is a positional, however it is spelled (a title `--help` or `--`). The one exception is a
+ * last token `--json`, which is the global flag wherever it stands: a caller may append it after free text.
  * @param {string[]} argv
  * @param {Registry} registry
  */
 function parseArgv(argv, registry) {
   const json = hasGlobal(argv, "--json");
   const help = hasGlobal(argv, "--help") || hasGlobal(argv, "-h");
+  if (trailingJson(argv)) argv = argv.slice(0, -1);
+  const first = argv.findIndex((token) => token !== "--json");
+  if (argv[first] === "--version" || argv[first] === "-v") argv = [...argv.slice(0, first), "version", ...argv.slice(first + 1)];
   const words = [];
   let k = 0;
   for (; k < argv.length; k++) {
@@ -165,10 +172,21 @@ function parseArgv(argv, registry) {
   return { json, help, verb, words, args, flags };
 }
 
-/** True when `flag` appears before any `--` terminator. @param {string[]} argv @param {string} flag */
+/** True when `flag` appears before any `--` terminator, or is `--json` as the last token. @param {string[]} argv @param {string} flag */
 function hasGlobal(argv, flag) {
+  if (flag === "--json" && trailingJson(argv)) return true;
   const end = argv.indexOf("--");
   return (end < 0 ? argv : argv.slice(0, end)).includes(flag);
+}
+
+/**
+ * True when the last token is `--json` standing after a `--` terminator with no `--json` before it: a caller that
+ * appends the flag after free text means the flag, while one that already gave it means the text.
+ * @param {string[]} argv
+ */
+function trailingJson(argv) {
+  const end = argv.indexOf("--");
+  return end >= 0 && end < argv.length - 1 && argv[argv.length - 1] === "--json" && !argv.slice(0, end).includes("--json");
 }
 
 /**
@@ -213,7 +231,14 @@ export async function runCli(registry, argv, io) {
       env: io.env,
       cwd: io.cwd,
     });
-    emit(io, json, { ok: result.ok ?? true, ...result.data }, result.text);
+    // `text` is the human reading of the result, carried in JSON too so a host can show it without re-deriving it.
+    const data = result.data ?? {};
+    const ok = result.ok ?? true;
+    /** @type {{ ok: boolean } & Record<string, unknown>} */
+    const envelope = { ok, ...data, text: typeof data.text === "string" ? data.text : result.text };
+    // A verb that ran and refused carries its reason as `message`, as a failure does, so a host reads one field.
+    if (!ok && envelope.message === undefined) envelope.message = result.text;
+    emit(io, json, envelope, result.text);
     return result.exit ?? 0;
   } catch (error) {
     return report(io, json, error);
@@ -248,7 +273,8 @@ function report(io, json, error) {
     const detail = { code: failure.code, message: failure.message };
     if (failure.path !== undefined) detail.path = failure.path;
     if (failure.line !== undefined) detail.line = failure.line;
-    io.stdout.write(`${JSON.stringify({ ok: false, error: detail })}\n`);
+    // `message` repeats the reason as a plain string beside the structured `error`, for a host that shows one line.
+    io.stdout.write(`${JSON.stringify({ ok: false, error: detail, message: failure.message })}\n`);
   } else {
     io.stderr.write(`lampstand: ${failure.code}: ${failure.message}\n`);
   }

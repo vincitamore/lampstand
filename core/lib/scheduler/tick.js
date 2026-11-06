@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { atomicWrite, errorMessage } from "../io.js";
 import { isDue } from "../governance/jobs.js";
 import { openHouseDb, runJob } from "../governance/run.js";
+import { localDate } from "../org/markdown.js";
 
 /** @typedef {import("../governance/jobs.js").House} House */
 /** @typedef {import("../governance/run.js").RunRecord} RunRecord */
@@ -142,7 +143,7 @@ function writeCapture(root, failures, at) {
   const body = [
     "---",
     "kind: capture",
-    `created: ${at.toISOString().slice(0, 10)}`,
+    `created: ${localDate(at)}`,
     "source: lampstand tick",
     "---",
     "",

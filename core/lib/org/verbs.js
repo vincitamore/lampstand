@@ -11,7 +11,7 @@ import { appendLog, findSession, listSessions, newSession, readSession } from ".
 import { checkDate, createItem, findItem, fullPath, scanItems, statusOf, stemOfItem, titleOf, transition } from "./items.js";
 import { moveAndRelink, relinkHouse } from "./links.js";
 import { findingLine, lintOrg } from "./lint.js";
-import { slugify, utcDate } from "./markdown.js";
+import { slugify, localDate } from "./markdown.js";
 import { fieldName, isTerminal, loadOrgSchema } from "./schema.js";
 
 /** @typedef {import("../cli.js").Verb} Verb */
@@ -122,8 +122,11 @@ function listResult(items, options) {
 /** @param {Transition} done */
 function transitionText(done) {
   const moved = done.from === done.to ? `${done.to}: status ${done.status}` : `${done.from} -> ${done.to} (${done.status})`;
+  const name = (/** @type {string} */ rel) => rel.slice(rel.lastIndexOf("/") + 1);
+  const renamed = name(done.from) === name(done.to) ? "" : `; a file named ${name(done.from)} was already there, so it is saved as ${name(done.to)}`;
   const links = done.relinked.reduce((sum, file) => sum + file.links, 0);
-  return links === 0 ? moved : `${moved}; relinked ${links} link${links === 1 ? "" : "s"} in ${done.relinked.length} file${done.relinked.length === 1 ? "" : "s"}`;
+  const relinked = links === 0 ? "" : `; relinked ${links} link${links === 1 ? "" : "s"} in ${done.relinked.length} file${done.relinked.length === 1 ? "" : "s"}`;
+  return `${moved}${renamed}${relinked}`;
 }
 
 /** @param {Transition} done */
@@ -155,18 +158,24 @@ function runTransition(context, select, what, change) {
 function runCreate(context, kindName, extra = {}) {
   const { root, schema } = open(context);
   const kind = kindNamed(schema, kindName);
-  const rel = createItem(root, schema, kind, {
+  const created = createItem(root, schema, kind, {
     title: extra.title ?? context.args[context.args.length - 1],
     body: extra.body ?? bodyText(context),
     fields: extra.fields,
     stem: extra.stem,
   });
-  return { data: { path: rel, kind: kind.name }, text: `created ${rel}` };
+  const rel = created.path;
+  const stem = rel.slice(rel.lastIndexOf("/") + 1, -3);
+  const note = stem === created.wanted ? "" : ` (a ${kind.name} named ${created.wanted}.md already existed; saved as ${stem}.md)`;
+  return { data: { path: rel, kind: kind.name, renamedFrom: stem === created.wanted ? null : `${created.wanted}.md` }, text: `created ${rel}${note}` };
 }
 
 const BODY = { body: { type: /** @type {const} */ ("string"), summary: "text to put under the title, or - to read it from stdin" } };
 const RESOLUTION = {
-  resolution: { type: /** @type {const} */ ("string"), summary: "one line naming where the work landed: a [[wikilink]] or a URL; for dropped, withdrawn or abandoned, a plain reason" },
+  resolution: {
+    type: /** @type {const} */ ("string"),
+    summary: "one line: where the work landed (a [[wikilink]] or a URL); for a decision decided, the ruling in plain words; for dropped, withdrawn or abandoned, a plain reason",
+  },
 };
 const LIST_FLAGS = {
   all: { type: /** @type {const} */ ("boolean"), summary: "include resolved items" },
@@ -192,7 +201,13 @@ export const taskListVerb = {
   flags: { ...LIST_FLAGS, ...WORKSPACE_FLAGS },
   run(context) {
     const { root, schema } = open(context);
-    return listResult(itemsOf(root, schema, [kindNamed(schema, "task")]), { schema, all: context.flags.all === true, status: text(context, "status") });
+    return listResult(itemsOf(root, schema, [kindNamed(schema, "task")]), {
+      schema,
+      all: context.flags.all === true,
+      status: text(context, "status"),
+      sortByDue: true,
+      today: localDate(),
+    });
   },
 };
 
@@ -363,7 +378,7 @@ export const remindListVerb = {
   run(context) {
     const { root, schema } = open(context);
     const items = itemsOf(root, schema, [kindNamed(schema, "reminder")]);
-    return listResult(items, { schema, all: context.flags.all === true, status: text(context, "status"), sortByDue: true, today: utcDate() });
+    return listResult(items, { schema, all: context.flags.all === true, status: text(context, "status"), sortByDue: true, today: localDate() });
   },
 };
 
@@ -381,19 +396,20 @@ export const remindDoneVerb = {
 /** @type {Verb} */
 export const statusVerb = {
   name: "status",
-  summary: "org counts per kind and status, then only the problems (--orient: held to the orientation budget)",
+  summary: "org counts, then what needs attention: open tasks, decisions, reminders due, uncommitted changes, problems (--orient: only that, within its budget)",
   flags: { orient: { type: "boolean", summary: "the dynamic orientation text a session starts with, within its budget" }, ...WORKSPACE_FLAGS },
   run(context) {
     const root = houseRoot(context);
     const found = orient(root, { env: context.env });
+    const data = { house: root, counts: found.counts, problems: found.problems, attention: found.attention, uncommitted: found.uncommitted };
     if (context.flags.orient) {
       const capped = capLines(found.lines, found.cap);
       return {
-        data: { house: root, counts: found.counts, problems: found.problems, text: capped.text, omitted: capped.omitted, cap: found.cap, profile: found.profile },
+        data: { ...data, text: capped.text, omitted: capped.omitted, cap: found.cap, profile: found.profile },
         text: capped.text,
       };
     }
-    return { data: { house: root, counts: found.counts, problems: found.problems }, text: found.lines.join("\n") };
+    return { data, text: [...found.countLines, ...found.lines].join("\n") };
   },
 };
 
@@ -408,8 +424,10 @@ export const lintVerb = {
     const errors = findings.filter((finding) => finding.level === "error").length;
     const info = findings.length - errors;
     const summary = `${errors} error${errors === 1 ? "" : "s"}, ${info} info in ${items.length} org file${items.length === 1 ? "" : "s"}`;
+    // Lint ran, so the result is ok whatever it found: the findings are its answer, never a refusal. The exit code
+    // still marks an error-level finding for a script or a CI step.
     return {
-      ok: errors === 0,
+      ok: true,
       exit: errors === 0 ? 0 : 1,
       data: { house: root, errors, info, files: items.length, findings },
       text: [...findings.map(findingLine), summary].join("\n"),

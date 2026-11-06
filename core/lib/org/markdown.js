@@ -249,9 +249,14 @@ export function keyLine(text, key) {
   return span ? span.start + 1 : 1;
 }
 
-/** Today's date in UTC as YYYY-MM-DD. @param {Date} [now] */
-export function utcDate(now = new Date()) {
-  return now.toISOString().slice(0, 10);
+/**
+ * The local calendar date as YYYY-MM-DD: the one "today" every dated act reads (created, resolved, proposed, adopted,
+ * overdue), so an item made in the evening carries the date its operator sees on the wall, not the UTC date.
+ * @param {Date} [now]
+ */
+export function localDate(now = new Date()) {
+  const pad = (/** @type {number} */ n) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
 /** True for a YYYY-MM-DD string naming a real calendar date. @param {string} text */

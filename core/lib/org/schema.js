@@ -27,6 +27,7 @@ import { parseToml } from "../parse/toml.js";
  *   resolved_folder: string,
  *   resolved_fields: Field[],
  *   unlanded_statuses: string[],
+ *   ruling_statuses: string[],
  *   kinds: Record<string, DefaultKind>,
  *   house_toml: Schema,
  * }} OrgSchemaFile
@@ -98,6 +99,8 @@ const DEFAULT_REQUIRED = Object.freeze(["kind", "title", "status", "created"]);
 /** The fields lampstand reads or writes besides the kind field, which `fields` may rename per kind. */
 /** Terminal statuses that mean the work landed nowhere: their resolution is a reason, not a link. */
 export const UNLANDED_STATUSES = Object.freeze([...ORG_SCHEMA_FILE.unlanded_statuses]);
+/** Terminal statuses that record a ruling (a decision decided): their resolution is the ruling in plain words. */
+export const RULING_STATUSES = Object.freeze([...ORG_SCHEMA_FILE.ruling_statuses]);
 
 const FIELDS = /** @type {const} */ (["title", "status", "created", "due", "resolved", "resolution"]);
 
