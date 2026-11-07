@@ -3,6 +3,8 @@
 - Kernel: the `lampstand-kernel` prompt section carries K, or a one-line pointer when the house's AGENTS.md region
   will load in this session (Hermes loads one kind of context file, so a shadowing file means K must come from here).
 - Dynamic orientation: the first turn's `pre_llm_call` runs `lampstand status --orient`.
+- Constitution changes: Hermes freezes the system prompt per session, so a later turn's `pre_llm_call` names what the
+  house adopted or struck since the chat began (constitution.py).
 - Worker: the `lampstand_delegate` tool composes W with `agents/<role>.md` into a Hermes subagent launch.
 - Maintenance gate: `pre_verify` asks `lampstand gate` with the paths the session changed.
 
@@ -25,7 +27,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from . import agora
+from . import agora, constitution
 from .cockpit import remember_house
 from .context import house_region_loads
 from .node import CliFailed, NodeMissing, run_cli
@@ -206,6 +208,12 @@ class Adapter:
         if found.root is None:
             return ""
         _mark_actor(platform, found.root)
+        # The section is rendered once per session (Hermes freezes the system prompt): what it carries is the
+        # baseline a later turn is compared with, so an adoption made while the chat is open still reaches it.
+        try:
+            constitution.remember(str(info.get("session_id") or ""), found.root)
+        except OSError as error:
+            logger.warning("lampstand: could not record the constitution this session started with: %s", error)
         return kernel_section(found.root, cwd)
 
     # The first turn's orientation.
@@ -239,7 +247,7 @@ class Adapter:
             except OSError as error:
                 logger.warning("lampstand rooms: %s", error)
         if not is_first_turn:
-            return None
+            return self._constitution_changed(str(kwargs.get("session_id") or ""), platform)
         cwd = self._session_cwd()
         try:
             found = resolve_house(cwd, workspace=has_workspace(platform or self._session_platform()))
@@ -250,6 +258,10 @@ class Adapter:
             return None
         _mark_actor(platform or self._session_platform(), found.root)
         self._start(str(kwargs.get("session_id") or ""), found.root)
+        try:
+            constitution.remember(str(kwargs.get("session_id") or ""), found.root)
+        except OSError as error:
+            logger.warning("lampstand: could not record the constitution this session started with: %s", error)
         try:
             remember_house(found.root)
         except OSError:
@@ -276,6 +288,24 @@ class Adapter:
             notices.append(stale)
         lines = [f"lampstand house {found.root}:", *notices, *([orientation] if orientation else [])]
         return {"context": "\n".join(lines)}
+
+    def _constitution_changed(self, session_id: str, platform: str) -> dict | None:
+        """A later turn: when the house adopted or struck something since this chat's prompt was built (Hermes
+        builds it once per session), the turn carries a short note of what changed. None when nothing did."""
+        if not session_id:
+            return None
+        try:
+            found = resolve_house(self._session_cwd(), workspace=has_workspace(platform or self._session_platform()))
+        except LampstandError:
+            return None
+        if found.root is None:
+            return None
+        try:
+            note = constitution.turn_note(session_id, found.root)
+        except OSError as error:
+            logger.warning("lampstand: could not compare the constitution with this session's: %s", error)
+            return None
+        return {"context": note} if note else None
 
     # The end of a turn: a post the model makes after this is its own, no longer an answer to a room wake.
 

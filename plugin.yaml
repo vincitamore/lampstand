@@ -1,6 +1,6 @@
 manifest_version: 2
 name: lampstand
-version: 0.3.0
+version: 0.3.1
 description: "Plants a house: a git repository you own that holds your agent's principles, rules, tasks, decisions and knowledge as plain files. In Hermes it is a whole cockpit: the house loads into every session started inside it, its work, inbox, knowledge and constitution are native tools, the desktop gets a House page with a lampstand of five lamps for its health, and Agora rooms wake the chats you bring into them."
 author: vincitamore
 license: MIT
@@ -35,3 +35,7 @@ config_schema:
     type: str
     default: ""
     description: "The agora checkout to use for rooms, when the one behind the `agora` command is not it. Empty finds it from PATH."
+  agora_config:
+    type: str
+    default: ""
+    description: "The agora config this profile's rooms use (a path), and so its rooms, identity and state. Empty lets agora find its own: AGORA_CONFIG, ./agora.json, then ~/.agora/config.json. One gateway serves every profile, so this is how a profile gets rooms of its own."
