@@ -53,7 +53,8 @@ never writes a Hermes `SOUL.md`.
   or the page is open. That checkout is code outside this plugin's pinned tree, and it runs with the gateway's
   environment. A background thread in the gateway polls each listening chat's rooms every 15 seconds; it starts with
   the first listen and stops when none is left. lampstand makes no network request of its own; agora's transports make
-  theirs, with agora's own credentials, which never pass through lampstand.
+  theirs, with agora's own credentials, which never pass through lampstand. With the `agora_config` setting, agora runs
+  with `AGORA_CONFIG` set to that path (and no inherited `AGORA_STATE`) for that profile's chats only.
 - In Hermes it reads, read-only, the profile's session store (`state.db`, the `sessions` table) to find the route key
   of a chat the desktop names by its stored id, and the profile's config for `allow_gateway_injection`.
 - The shell (`sh`, or `cmd.exe` on Windows): on Windows, to start a `.cmd` or `.bat` program, which only `cmd.exe`

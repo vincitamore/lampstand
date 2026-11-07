@@ -10,6 +10,7 @@ nothing, so a caller that rewrites the file never saves an empty list over every
 from __future__ import annotations
 
 import contextlib
+import contextvars
 import importlib
 import json
 import os
@@ -35,9 +36,41 @@ def hermes_module(name: str) -> Any:
         return None
 
 
+# The home a background thread works for (the room watch). A multiplexed gateway keeps each profile's home in a
+# context variable that a new thread does not inherit, so the watch pins the home of each listen's profile itself.
+_PINNED_HOME: contextvars.ContextVar[str | None] = contextvars.ContextVar("lampstand_pinned_home", default=None)
+
+
+@contextlib.contextmanager
+def pinned_home(home: str | Path) -> Iterator[None]:
+    """Runs the block as if for the profile at `home`: lampstand's own files, and Hermes's resolver (so the profile's
+    config and settings are read) when Hermes is importable. Only the calling thread's context changes."""
+    token = _PINNED_HOME.set(str(home))
+    constants = hermes_module("hermes_constants")
+    hermes_token = None
+    setter = getattr(constants, "set_hermes_home_override", None) if constants is not None else None
+    resetter = getattr(constants, "reset_hermes_home_override", None) if constants is not None else None
+    if callable(setter) and callable(resetter):
+        try:
+            hermes_token = setter(str(home))
+        except Exception:
+            hermes_token = None
+    try:
+        yield
+    finally:
+        if hermes_token is not None and callable(resetter):
+            with contextlib.suppress(Exception):
+                resetter(hermes_token)
+        _PINNED_HOME.reset(token)
+
+
 def hermes_home() -> Path:
-    """The Hermes home of the profile this call runs for: Hermes's own resolver when it is importable (a multiplexed
-    gateway scopes it per profile), else HERMES_HOME, else the platform default Hermes uses."""
+    """The Hermes home of the profile this call runs for: a home pinned by `pinned_home`, else Hermes's own resolver
+    when it is importable (a multiplexed gateway scopes it per profile), else HERMES_HOME, else the platform default
+    Hermes uses."""
+    pinned = _PINNED_HOME.get()
+    if pinned:
+        return Path(pinned)
     constants = hermes_module("hermes_constants")
     if constants is not None:
         try:

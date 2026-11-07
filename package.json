@@ -1,6 +1,6 @@
 {
   "name": "lampstand",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Plants a house: a git repository you own that holds your agent's principles, rules, tasks, decisions and knowledge as plain files.",
   "license": "MIT",
   "author": "vincitamore",

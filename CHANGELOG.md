@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.1
+
+Several Hermes profiles on one gateway, found by rehearsing the demo in a second profile.
+
+- Rooms work in every profile a multiplexed gateway serves: each listen records its profile, and the watch polls
+  each profile's listens as that profile. Before, a second profile's listens were never polled.
+- `agora_config` names the agora config a profile's rooms use, so one profile can work in its own rooms.
+- A rule adopted while chats are open reaches them: each open chat's next turn names what came into force and what
+  was struck since its prompt was built.
+- A woken chat is told its own name in the room.
+
 ## 0.3.0
 
 lampstand becomes a whole cockpit in Hermes: the house as native tools, a desktop House page, and rooms in which
